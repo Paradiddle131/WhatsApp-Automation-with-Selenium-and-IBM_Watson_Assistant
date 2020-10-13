@@ -1,8 +1,10 @@
 import re
+import sys
 import time
+import datetime
 import datetime as dt
 import json
-
+import pyautogui
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -28,6 +30,7 @@ except ModuleNotFoundError:
 
 RELOAD_TIMEOUT = 10
 ERROR_TIMEOUT = 5
+non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
 
 class WhatsApp():
     """
@@ -180,16 +183,81 @@ class WhatsApp():
                 print("Element couldn't be found.")
                 break
 
+    def valid_date(self, datestring):
+        try:
+            mat = re.match(r'(\d{2})[/.-](\d{2})[/.-](\d{4})$', datestring)
+            if mat is not None:
+                datetime.datetime(*(map(int, mat.groups()[-1::-1])))
+                return True
+        except ValueError:
+            pass
+        return False
+
+    # TODO: -
+    def findmsg(self, name):
+        partial = 0
+        chats = []
+        try:
+            search = self.browser.find_element_by_css_selector(self.search_selector)
+            search.send_keys(name + Keys.ENTER)  # we will send the name to the input key box
+        except:
+            return None
+        for i in range(40):
+            time.sleep(1)
+            pyautogui.press('up')
+        msg = [name]
+        prev = 'Unknown'
+        htmlcode = self.browser.page_source.encode('utf-8')
+        soup = BeautifulSoup(htmlcode, features="html.parser")
+        cnt = 0
+        for tag in soup.find_all('span'):
+            classid = tag.get('class')
+            if classid == ['_3Whw5', 'selectable-text', 'invisible-space', 'copyable-text']:
+                msg.append([tag.text.translate(non_bmp_map).replace('\n', '')])
+            if classid == ['_3fnHB']:
+                try:
+                    if msg[-1][-1] in [1, 2]:
+                        msg[-1].append(tag.text)
+                except:
+                    partial = 1
+            if classid in [['EopGb', '_3HIqo'], ['EopGb']]:
+                try:
+                    msg[-1].append(len(classid))
+                except:
+                    partial = 1
+            if classid == ['_F7Vk']:
+                try:
+                    if tag.text in ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
+                                    'TODAY', 'YESTERDAY'] or self.valid_date(tag.text):
+                        msg[-1].append(tag.text)
+                except:
+                    if tag.text in ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
+                                    'TODAY', 'YESTERDAY'] or self.valid_date(tag.text):
+                        prev = tag.text
+                    partial = 1
+        for i in msg:
+            if len(i) > 4:
+                i = i[:4]
+
+        for i in msg[1:]:
+            if len(i) == 3:
+                i.append(prev)
+            else:
+                prev = i[-1]
+        chats.append(msg)
+
     def get_messages(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
         search.send_keys(chat_name + Keys.ENTER)  # we will send the name to the input key box
         scrollbar = self.browser.find_element_by_xpath('//*[@id="main"]/div[3]/div/div')
 
         # loop through every message in the chat
-        rows_element = self.browser.find_element_by_xpath('//*[@id="main"]/div[3]/div/div/div[3]')
+        rows_xpath = '//*[@id="main"]/div[3]/div/div/div[3]'
+        rows_element = self.browser.find_element_by_xpath(rows_xpath)
         html = rows_element.get_attribute('innerHTML')
         soup = BeautifulSoup(html, 'html.parser')
         children_rows = soup.findChildren(recursive=False)
+
 
         v = 0
         for message_element in children_rows:
@@ -197,46 +265,35 @@ class WhatsApp():
             if v < 2:
                 v += 1
                 continue
-            for x in message_element.contents[1 if str(message_element.contents[0]).startswith('<span>') else 0].\
-                contents[1 if str(message_element.contents[0]).startswith('<span>') else 0].contents[0]:
-                print(str(x))
-            print()
-
-        for message_element in children_rows:
-            str(message_element)
-
-            # loop through every element in a message box
-            message_box_element = self.browser.find_element_by_xpath('//*[@id="main"]/div[3]/div/div/div[3]/div[4]/div/div/div/div')
-            html = message_box_element.get_attribute('innerHTML')
-            soup = BeautifulSoup(html, 'html.parser')
-            children = soup.findChildren(recursive=False)
-            # TODO: -
-            for i, child in enumerate(children, 1):
-                if "color-16" in str(child):
-                    print('Sender name/number found in element #'+str(i), " ->", str(child).split("button\">")[0].split("</span>")[0])
-                elif "copyable-text" in str(child):
-                    print('Message found in element #'+str(i), " ->", str(child).split("<span>")[0].split("</span>")[0])
+            for i, message_attribute in enumerate(message_element.contents[1 if str(message_element.contents[0]).startswith('<span>') else 0].\
+                contents[1 if str(message_element.contents[0]).startswith('<span>') else 0].contents[0].contents, 1):
+                # TODO: time number ve belki message attrs altindan alinabilir split yerine
+                # if the message is a reply to another
+                # if "color" in str(message_attribute):
+                # if message_attribute.contents[0]:
+                if message_attribute.attrs['class'][1] == 'copyable-text':
+                    print('Sender name/number found in element #'+str(i), " ->",
+                          message_attribute.contents[1].contents[0].contents[0].text)
+                          # str(message_attribute).split("button\">")[1].split("</span>")[0])
+                    # print('Sender name/number found in element #'+str(i), " ->", str(message_attribute).split("button\">")[1].split("</span>")[0])
+                elif "copyable-text" in str(message_attribute):
+                    if 'data-plain-text' in str(message_attribute):
+                        # if message_attribute
+                        print('Message found in element #'+str(i), " ->", str(message_attribute).split("<span>")[1].split("<span class")[0])
+                    else:
+                        print('Message found in element #'+str(i), " ->", str(message_attribute).split("<span>")[1].split("</span>")[0])
                     # region save messages to json
                     # with open(chat_name+"_messages.json", "w+", encoding='utf-8') as f:
                     #     # TODO: TR karakterleri replace eden method yaz
                     #     json.dump(dict_messages, f, ensure_ascii=False)
                     #     print(f"INFO: Messages saved to {chat_name}_messages.json")
                     # endregion
-                elif self.do_contains_time(str(child.contents[0].contents[0])):
-                    print('Time found in element #'+str(i), " ->", str(child).split("<\"auto\">")[0].split("</span>")[0])
-                    # print('time is:', )
-                elif 'img class' in str(child):
-                    print('Image found in element #'+str(i), " ->", str(child))
-
+                elif self.do_contains_time(str(message_attribute.contents[0].contents[0])):
+                    print('Time found in element #'+str(i), " ->", self.find_time(str(message_attribute)))
+                elif 'img class' in str(message_attribute):
+                    print('Image found in element #'+str(i), " ->", str(message_attribute))
         exit()
 
-        # html = rows_element.get_attribute('innerHTML')
-        # soup = BeautifulSoup(html, "html.parser")
-        # soup.find_all(lambda tag: tag.name == 'span' and
-        #                           tag.get('dir') == 'ltr' and
-        #                           '_3Whw5 selectable-text invisible-space copyable-text'
-        #                           in tag.get('class'))
-        chat_screen_xpath = '//*[@id="main"]/div[3]/div/div/div[3]'
         # chat_screen_element = self.browser.find_element_by_xpath(chat_screen_xpath)
         j = 20
         scroll_count = 0
@@ -252,9 +309,9 @@ class WhatsApp():
             if j == 150:
                 break
             try:
-                author_element = self.browser.find_element_by_xpath(chat_screen_xpath + f"/div[{j}]/div/div/div/div/span")
-                time_element = self.browser.find_element_by_xpath(chat_screen_xpath + f"/div[{j}]/div/div/div/div[3]")
-                message_element = self.browser.find_element_by_xpath(chat_screen_xpath + f"/div[{j}]/div/div/div/div/div/span/span")
+                author_element = self.browser.find_element_by_xpath(rows_xpath + f"/div[{j}]/div/div/div/div/span")
+                time_element = self.browser.find_element_by_xpath(rows_xpath + f"/div[{j}]/div/div/div/div[3]")
+                message_element = self.browser.find_element_by_xpath(rows_xpath + f"/div[{j}]/div/div/div/div/div/span/span")
                 if message_element.text in dict_messages and \
                         (author_element.text, time_element.text) in dict_messages[message_element.text]:
                     print(message_element.text)
@@ -373,7 +430,7 @@ class WhatsApp():
     #         self.browser.get(url)
     #         time.sleep(ERROR_TIMEOUT)
     #endregion
-
+    #region other methods
     # This method is used to get the main page
     def goto_main(self):
         try:
@@ -796,7 +853,10 @@ class WhatsApp():
     def do_contains_time(self, text):
         return re.compile(r'(\d|1[0-2]):([0-5]\d) (am|pm)').search(text)
 
-#region unused functions
+    def find_time(self, text):
+        return [x.group() for x in re.finditer(r'(\d|1[0-2]):([0-5]\d) (am|pm)', text)][0]
+    #endregion
+    #region unused functions
     # from wand.image import Image
     # def get_element_screenshot(self, element: WebElement) -> bytes:
     #     driver = element._parent
