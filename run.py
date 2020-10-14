@@ -11,7 +11,10 @@ if __name__ == '__main__':
     # list_participants = wa.get_group_participants(name)
     # print(f"\n\n\n @@@ {len(list_participants)} PARTICIPANTS: ", list_participants, "\n\n\n")
 
-    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_messages(name), "\n\n\n")
-    print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.findmsg(name), "\n\n\n")
-    time.sleep(7)
+    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_messages_by_attribute(name), "\n\n\n")
+    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_messages_by_class(name), "\n\n\n")
+    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.repeatfun(name), "\n\n\n")
+    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_last_messages(name), "\n\n\n")
+    print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_last_messages(name), "\n\n\n")
+    # time.sleep(7)
     wa.quit()

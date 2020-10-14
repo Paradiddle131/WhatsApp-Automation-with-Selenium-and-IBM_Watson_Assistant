@@ -3,3 +3,4 @@ requests==2.20.0
 Pillow==7.0.0
 beautifulsoup4==4.6.3
 PyAutoGUI==0.9.52
+PyGetWindow==0.0.9
