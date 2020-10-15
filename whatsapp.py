@@ -1,5 +1,4 @@
 import pygetwindow as gw
-import subprocess
 import re
 import sys
 import time
@@ -15,6 +14,7 @@ from selenium.common.exceptions import NoSuchElementException, ElementNotVisible
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 
+from IBM_Watson_Assistant import Watson
 from PIL import Image
 # from wand.image import Image
 
@@ -76,8 +76,7 @@ class WhatsApp():
 
     def send_message(self, name, message):
         message = self.emojify(message)  # this will emojify all the emoji which is present as the text in string
-        search = self.browser.find_element_by_css_selector(self.search_selector)
-        search.send_keys(name + Keys.ENTER)  # we will send the name to the input key box
+        self.enter_chat_screen(name)
         try:
             send_msg = WebDriverWait(self.browser, self.timeout).until(EC.presence_of_element_located(
                 (By.XPATH, "/html/body/div/div/div/div[4]/div/footer/div[1]/div[2]/div/div[2]")))
@@ -197,7 +196,6 @@ class WhatsApp():
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         cnt = 0
         for tag in soup.find_all("div", class_="message-in"):
-            cnt += 1
             message_text, message_sender, message_time, location = [None for x in range(4)]
             message = tag.find("span", class_="selectable-text")
             # self.browser.find_element_by_tag_name()
@@ -216,13 +214,15 @@ class WhatsApp():
             message_time = time.strptime(self.find_time(tag.text), time_format)
             # message_time = self.find_time(tag.text)
             if message_text != None:
+                cnt += 1
                 dict_messages.update(
                     {cnt:
                         {'sender': message_sender,
                         'message': message_text,
                         'time': message_time
                         }})
-        return sorted(dict_messages, key=lambda x: time.mktime(time.strptime(x['time'], '%d/%m/%Y %H:%M:%S')))
+        return dict_messages
+        # return sorted(dict_messages, key=lambda x: time.mktime(time.strptime(x['time'], '%d/%m/%Y %H:%M:%S')))
 
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
@@ -403,9 +403,19 @@ class WhatsApp():
 
 if __name__ == '__main__':
     wa = WhatsApp(100, session="mysession")
-    name = 'Genesis Best Grup'
+    watson = Watson()
+    # name = 'Genesis Best Grup'
+    name = 'Babam'
+    name_sandbox = 'Genesis Bot Sandbox'
+    dct_last_messages = wa.get_last_messages(name)
+    # print([dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages)+1)])
 
-    print(wa.get_last_messages(name))
+    messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages)+1)]
+    for message_to_read in messages_to_read:
+        message_to_send = watson.message_stateless(message_to_read, doPrint=True)
+        if message_to_send:
+            wa.send_message(name_sandbox, message_to_send['output']['generic'][0]['text'])
+
     wa.quit()
 
     #region unused ımage functions

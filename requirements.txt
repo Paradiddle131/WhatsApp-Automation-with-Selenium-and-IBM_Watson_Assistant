@@ -4,3 +4,5 @@ Pillow==7.0.0
 beautifulsoup4==4.6.3
 PyAutoGUI==0.9.52
 PyGetWindow==0.0.9
+ibm-watson==4.7.1
+python-dotenv==0.14.0
