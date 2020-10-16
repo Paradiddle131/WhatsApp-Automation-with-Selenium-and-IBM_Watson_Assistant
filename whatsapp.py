@@ -2,12 +2,11 @@ import base64
 from io import BytesIO
 
 import pygetwindow as gw
-import re
 import sys
 import time
-import datetime
 import datetime as dt
 import json
+from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,7 +17,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 
 from IBM_Watson_Assistant import Watson
-from PIL import Image
+from whatsapp_helper import *
 
 try:
     from bs4 import BeautifulSoup
@@ -221,20 +220,20 @@ class WhatsApp():
                 if message2:
                     message_text = message2.text
                     # location = self.browser.page_source.find(message2.text)
-            if self.do_contains_image(str(tag)) and not self.do_contains_audio(str(tag)):
-                image_link = self.find_image(str(tag))
+            if do_contains_image(str(tag)) and not do_contains_audio(str(tag)):
+                image_link = find_image(str(tag))
                 image = self.bytes_to_image(self.get_file_content_chrome(image_link))
                 image.save(f'output/image_{cnt}.png')
                 # TODO: Insert OCR methods here
-            if self.do_contains_sender(str(tag)):
-                sender = tag.find("div", class_=self.find_sender(str(tag)))
+            if do_contains_sender(str(tag)):
+                sender = tag.find("div", class_=find_sender(str(tag)))
                 if sender:
                     sender2 = sender.find('span')
                     if sender2:
                         message_sender = sender2.text
             # TODO: message_time has been changed due to sorting purposes, test it
-            message_time = time.strptime(self.find_time(tag.text), time_format)
-            # message_time = self.find_time(tag.text)
+            message_time = time.strptime(find_time(tag.text), time_format)
+            # message_time = find_time(tag.text)
             if message_text != None:
                 cnt += 1
                 dict_messages.update(
@@ -248,46 +247,6 @@ class WhatsApp():
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
         search.send_keys(chat_name + Keys.ENTER)
-
-    def is_phone_number(self, text):
-        return re.compile(r'^(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$').search(text)
-
-    def find_phone_number(self, text):
-        return [x.group() for x in re.finditer(r'^(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$', text)][0]
-
-    def do_contains_audio(self, text):
-        return re.compile(r'<audio preload=').search(text)
-
-    def find_audio(self, text):
-        return [x.group() for x in re.finditer(r'<audio preload=', text)][0]
-
-    def do_contains_image(self, text):
-        return re.compile(r'blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}').search(text)
-
-    def find_image(self, text):
-        return [x.group() for x in re.finditer(r'blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}', text)][0]
-
-    def do_contains_sender(self, text):
-        return re.compile(r'\w{5,6} color-[0-9]{1,2} \w{5,6}').search(text)
-
-    def find_sender(self, text):
-        return [x.group() for x in re.finditer(r'\w{5,6} color-[0-9]{1,2} \w{5,6}', text)][0]
-
-    def do_contains_time(self, text):
-        return re.compile(r'(\d|1[0-2]):([0-5]\d) (am|pm)').search(text)
-
-    def find_time(self, text):
-        return [x.group() for x in re.finditer(r'(\d|1[0-2]):([0-5]\d) (am|pm)', text)][0]
-
-    def valid_date(self, datestring):
-        try:
-            mat = re.match(r'(\d{2})[/.-](\d{2})[/.-](\d{4})$', datestring)
-            if mat is not None:
-                datetime.datetime(*(map(int, mat.groups()[-1::-1])))
-                return True
-        except ValueError:
-            pass
-        return False
 
     def quit(self):
         self.browser.quit()
