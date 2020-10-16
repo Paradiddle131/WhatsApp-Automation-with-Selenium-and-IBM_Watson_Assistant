@@ -47,7 +47,6 @@ class Watson():
         ).get_result()
 
     def message_stateless(self, text, doPrint=False):
-        print("ERROR HERE:", text)
         response = self.ASSISTANT.message_stateless(
             assistant_id=self.ASSISTANT_ID,
             input={
@@ -55,19 +54,26 @@ class Watson():
                 'text': text
             }
         ).get_result()
+        if 'Çözüldü' in [entity['entity'] for entity in response['output']['entities']]:
+            print(f'------------------------\nEntity "Çözüldü" found on the text: {text}')
+            return ''
         if doPrint:
             self.print_reply_with_intent(response, text)
         return response
 
     def print_reply_with_intent(self, response, text=''):
-        print("------------------------")
-        if len(response['output']['intents']) != 0:
-            print(f"Response of the text \"{text}\" is below: \n" +
-                  "Captured Intent:", response['output']['intents'][0]['intent'], "\n" +
-                  "Reply:", response['output']['generic'][0]['text'])
-        else:
-            print(f"Response for the text: \"{text}\"\n" + response['output']['generic'][0]['text'])
-
+        bot_reply = []
+        print(f"------------------------\nResponse of the text \"{text}\" is below:")
+        intents = response['output']['intents']
+        entities = response['output']['entities']
+        assistant_reply = response['output']['generic'][0]['text']
+        if len(intents) != 0:
+            bot_reply.append("Captured Intent: " + intents[0]['intent'] + "\n")
+        if len(entities) != 0:
+            for entity in entities:
+                bot_reply.append("Captured Entity: " + entity['entity'] + "\n")
+        bot_reply.append("Reply: " + assistant_reply)
+        print(''.join(bot_reply))
 
 if __name__ == '__main__':
     watson = Watson()
