@@ -1,5 +1,4 @@
 import os
-import json
 from dotenv import load_dotenv
 from ibm_watson import AssistantV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
@@ -75,7 +74,9 @@ class Watson():
         bot_reply.append("Reply: " + assistant_reply)
         print(''.join(bot_reply))
 
+
 if __name__ == '__main__':
     watson = Watson()
     watson.message_stateless('OKC den fatura alamıyoruz', doPrint=True)
-    watson.message_stateless('something', doPrint=True)
+    watson.message_stateless('teşekkürler', doPrint=True)
+    watson.message_stateless('1-144E32PT6 Cihaz order açıkta kaldı ön ödemede var yardım alabilirmiyim tamamlanması için', doPrint=True)
