@@ -18,6 +18,7 @@ from selenium.webdriver.chrome.options import Options
 
 from IBM_Watson_Assistant import Watson
 from whatsapp_helper import *
+from OCR import *
 
 try:
     from bs4 import BeautifulSoup
@@ -25,13 +26,13 @@ except ModuleNotFoundError:
     print(
         "Beautiful Soup Library is reqired to make this library work(For getting participants list for the specified group).\npip3 install beautifulsoup4")
 
-
 RELOAD_TIMEOUT = 10
 ERROR_TIMEOUT = 5
 non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
 time_format = '%I:%M %p'
 
-#TODO:
+
+# TODO:
 
 class WhatsApp():
     emoji = {}  # This dict will contain all emojies needed for chatting
@@ -63,6 +64,7 @@ class WhatsApp():
         # CSS SELECTORS AND XPATHS
         self.search_selector = ".cBxw- > div:nth-child(2)"
         self.browser.maximize_window()
+        self.OCR = OCR()
 
     # This method is used to emojify all the text emoji's present in the message
     def emojify(self, message):
@@ -126,7 +128,7 @@ class WhatsApp():
         header_class_name = "_1iFv8"
         participants_count = int(self.participants_count_for_group(group_name).split()[0])
         try:
-            click_menu = self.find_wait('.'+header_class_name, 'css')
+            click_menu = self.find_wait('.' + header_class_name, 'css')
             click_menu.click()
         except TimeoutException:
             raise TimeoutError("Your request has been timed out! Try overriding timeout!")
@@ -199,10 +201,12 @@ class WhatsApp():
             raise Exception("Request failed with status %s" % result)
         return base64.b64decode(result)
 
-    def bytes_to_image(self, bytes):
+    def bytes_to_image(self, bytes, image_name=None):
         stream = BytesIO(bytes)
         image = Image.open(stream).convert("RGBA")
         stream.close()
+        if image_name:
+            image.save(f'output/image_{image_name}.png')
         return image
 
     def get_last_messages(self, name):
@@ -222,9 +226,9 @@ class WhatsApp():
                     # location = self.browser.page_source.find(message2.text)
             if do_contains_image(str(tag)) and not do_contains_audio(str(tag)):
                 image_link = find_image(str(tag))
-                image = self.bytes_to_image(self.get_file_content_chrome(image_link))
-                image.save(f'output/image_{cnt}.png')
-                # TODO: Insert OCR methods here
+                image_bytes = self.get_file_content_chrome(image_link)
+                self.bytes_to_image(image_bytes, cnt)  # Save the image on output folder
+                message_text = message_text + " | " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
             if do_contains_sender(str(tag)):
                 sender = tag.find("div", class_=find_sender(str(tag)))
                 if sender:
@@ -234,14 +238,14 @@ class WhatsApp():
             # TODO: message_time has been changed due to sorting purposes, test it
             message_time = time.strptime(find_time(tag.text), time_format)
             # message_time = find_time(tag.text)
-            if message_text != None:
+            if message_text is not None:
                 cnt += 1
                 dict_messages.update(
                     {cnt:
-                        {'sender': message_sender,
-                        'message': message_text,
-                        'time': message_time
-                        }})
+                         {'sender': message_sender,
+                          'message': message_text,
+                          'time': message_time
+                          }})
         return dict_messages
 
     def enter_chat_screen(self, chat_name):
@@ -256,11 +260,12 @@ if __name__ == '__main__':
     wa = WhatsApp(100, session="mysession")
     watson = Watson()
     # name = 'Genesis Best Grup'
-    name = 'Babam'
+    name = 'KaVe Upwork'
+    # name = 'Babam'
     name_sandbox = 'Genesis Bot Sandbox'
     dct_last_messages = wa.get_last_messages(name)
 
-    messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages)+1)]
+    messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages) + 1)]
     for message_to_read in messages_to_read:
         message_to_send = watson.message_stateless(message_to_read, doPrint=True)
         if message_to_send:
