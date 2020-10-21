@@ -3,11 +3,11 @@ import datetime
 
 
 def is_phone_number(text):
-    return re.compile(r'^(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$').search(text)
+    return re.compile(r'^0*(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$').search(text)
 
 
 def find_phone_number(text):
-    return [x.group() for x in re.finditer(r'^(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$', text)][0]
+    return [x.group() for x in re.finditer(r'^0*(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$', text)][0]
 
 
 def do_contains_audio(text):
@@ -18,12 +18,28 @@ def find_audio(text):
     return [x.group() for x in re.finditer(r'<audio preload=', text)][0]
 
 
+def do_contains_quoted_image(text):
+    return re.compile(r'background-image: url\("blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"\);').search(text)
+
+
+def find_quoted_image(text):
+    return [x.group() for x in re.finditer(r'background-image: url\("blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"\);', text)][0]
+
+
 def do_contains_image(text):
     return re.compile(r'blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}').search(text)
 
 
 def find_image(text):
     return [x.group() for x in re.finditer(r'blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}', text)][0]
+
+
+def do_contains_quote(text):
+    return re.compile(r'quoted-mention \w{5,6}').search(text)
+
+
+def find_quote(text):
+    return [x.group() for x in re.finditer(r'quoted-mention \w{5,6}', text)][0]
 
 
 def do_contains_sender(text):

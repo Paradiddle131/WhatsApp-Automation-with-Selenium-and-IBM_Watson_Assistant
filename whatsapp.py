@@ -5,7 +5,6 @@ import pygetwindow as gw
 import sys
 import time
 import datetime as dt
-import json
 from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -32,9 +31,7 @@ non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
 time_format = '%I:%M %p'
 
 
-# TODO:
-
-class WhatsApp():
+class WhatsApp:
     emoji = {}  # This dict will contain all emojies needed for chatting
     browser = None
     timeout = 10  # The timeout is set for about ten seconds
@@ -184,6 +181,14 @@ class WhatsApp():
                 print("Element couldn't be found.")
                 break
 
+    def scroll_up_panel(self, element=None):
+        if not element:
+            element = self.browser.find_element_by_xpath('//*[@id="main"]/div[3]/div/div/div[3]')
+        for i in range(24):
+            time.sleep(0.2)
+            element.send_keys(Keys.ARROW_UP)
+        time.sleep(3)
+
     # extracts blob content as bytes
     def get_file_content_chrome(self, uri):
         result = self.browser.execute_async_script("""
@@ -211,40 +216,61 @@ class WhatsApp():
 
     def get_last_messages(self, name):
         dict_messages = {}
-        search = self.browser.find_element_by_css_selector(self.search_selector)
-        search.send_keys(name + Keys.ENTER)
-        time.sleep(3)
+        self.enter_chat_screen(name)
+        # time.sleep(3)
+        self.scroll_up_panel()
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         cnt = 0
+        message_text, message_sender = ['' for _ in range(2)]
         for tag in soup.find_all("div", class_="message-in"):
-            message_text, message_sender, message_time, location = [None for x in range(4)]
+            new_sender = False
+            # message_time, location = [None for _ in range(2)]
+            message_quote_sender, message_quote_text = [None for _ in range(2)]
             message = tag.find("span", class_="selectable-text")
-            if message:
-                message2 = message.find("span")
-                if message2:
-                    message_text = message2.text
-                    # location = self.browser.page_source.find(message2.text)
-            if do_contains_image(str(tag)) and not do_contains_audio(str(tag)):
-                image_link = find_image(str(tag))
-                image_bytes = self.get_file_content_chrome(image_link)
-                self.bytes_to_image(image_bytes, cnt)  # Save the image on output folder
-                message_text = message_text + " | " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
+            if do_contains_quote(str(tag)):
+                quote = tag.find("span", class_=find_quote(str(tag)))
+                if quote:
+                    message_quote_text = quote.text
+                    # print(message_quote_text)
+                    quote_sender = quote.parent.previous_sibling
+                    if quote_sender:
+                        quote_sender2 = quote_sender.find('span')
+                        if quote_sender2:
+                            message_quote_sender = quote_sender2.text
+                            # print(message_quote_sender)
             if do_contains_sender(str(tag)):
+                new_sender = True
+                message_text = ''
                 sender = tag.find("div", class_=find_sender(str(tag)))
                 if sender:
                     sender2 = sender.find('span')
                     if sender2:
                         message_sender = sender2.text
-            # TODO: message_time has been changed due to sorting purposes, test it
+            if message:
+                message2 = message.find("span")
+                if message2:
+                    message_text = message_text + " | " + message2.text.replace("\n", ' ') if message_text != '' else message2.text.replace("\n", ' ')
+                    # location = self.browser.page_source.find(message2.text)
+            if do_contains_image(str(tag)) \
+                    and not do_contains_audio(str(tag)) \
+                    and not do_contains_quoted_image(str(tag)):
+                image_link = find_image(str(tag))
+                image_bytes = self.get_file_content_chrome(image_link)
+                # self.bytes_to_image(image_bytes, cnt)  # Save the image on output folder
+                message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
             message_time = time.strptime(find_time(tag.text), time_format)
             # message_time = find_time(tag.text)
             if message_text is not None:
-                cnt += 1
+                if new_sender:
+                    cnt += 1
+                # TODO: Add Crew Member boolean to dictionary
                 dict_messages.update(
                     {cnt:
                          {'sender': message_sender,
                           'message': message_text,
-                          'time': message_time
+                          'time': message_time,
+                          'quote': {'sender': message_quote_sender,
+                                    'message': message_quote_text}
                           }})
         return dict_messages
 
@@ -259,17 +285,17 @@ class WhatsApp():
 if __name__ == '__main__':
     wa = WhatsApp(100, session="mysession")
     watson = Watson()
-    # name = 'Genesis Best Grup'
-    name = 'KaVe Upwork'
+    name = 'Genesis Best Grup'
+    # name = 'KaVe Upwork'
     # name = 'Babam'
     name_sandbox = 'Genesis Bot Sandbox'
     dct_last_messages = wa.get_last_messages(name)
 
     messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages) + 1)]
     for message_to_read in messages_to_read:
+        break
         message_to_send = watson.message_stateless(message_to_read, doPrint=True)
         if message_to_send:
             # wa.send_message(name_sandbox, message_to_send['output']['generic'][0]['text'])
             pass
-
     wa.quit()
