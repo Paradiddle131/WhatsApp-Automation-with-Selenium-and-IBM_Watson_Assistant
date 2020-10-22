@@ -5,6 +5,7 @@ import pygetwindow as gw
 import sys
 import time
 import datetime as dt
+import pandas as pd
 from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -29,7 +30,7 @@ RELOAD_TIMEOUT = 10
 ERROR_TIMEOUT = 5
 non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
 time_format = '%I:%M %p'
-
+path_home = os.getcwd()
 
 class WhatsApp:
     emoji = {}  # This dict will contain all emojies needed for chatting
@@ -62,6 +63,8 @@ class WhatsApp:
         self.search_selector = ".cBxw- > div:nth-child(2)"
         self.browser.maximize_window()
         self.OCR = OCR()
+        self.Watson = Watson()
+        self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
 
     # This method is used to emojify all the text emoji's present in the message
     def emojify(self, message):
@@ -181,10 +184,10 @@ class WhatsApp:
                 print("Element couldn't be found.")
                 break
 
-    def scroll_up_panel(self, element=None):
+    def scroll_up_panel(self, scroll_times=20, element=None):
         if not element:
             element = self.browser.find_element_by_xpath('//*[@id="main"]/div[3]/div/div/div[3]')
-        for i in range(24):
+        for i in range(scroll_times):
             time.sleep(0.2)
             element.send_keys(Keys.ARROW_UP)
         time.sleep(3)
@@ -214,11 +217,16 @@ class WhatsApp:
             image.save(f'output/image_{image_name}.png')
         return image
 
+    def is_crew_member(self, GSM):
+        GSM = GSM.split('+')[1] if '+' in GSM else GSM
+        df = pd.read_csv(self.participants_list_path)
+        return GSM in df['Vodafone_shops'].values
+
     def get_last_messages(self, name):
         dict_messages = {}
         self.enter_chat_screen(name)
         # time.sleep(3)
-        self.scroll_up_panel()
+        self.scroll_up_panel(30)
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         cnt = 0
         message_text, message_sender = ['' for _ in range(2)]
@@ -227,17 +235,6 @@ class WhatsApp:
             # message_time, location = [None for _ in range(2)]
             message_quote_sender, message_quote_text = [None for _ in range(2)]
             message = tag.find("span", class_="selectable-text")
-            if do_contains_quote(str(tag)):
-                quote = tag.find("span", class_=find_quote(str(tag)))
-                if quote:
-                    message_quote_text = quote.text
-                    # print(message_quote_text)
-                    quote_sender = quote.parent.previous_sibling
-                    if quote_sender:
-                        quote_sender2 = quote_sender.find('span')
-                        if quote_sender2:
-                            message_quote_sender = quote_sender2.text
-                            # print(message_quote_sender)
             if do_contains_sender(str(tag)):
                 new_sender = True
                 message_text = ''
@@ -246,6 +243,17 @@ class WhatsApp:
                     sender2 = sender.find('span')
                     if sender2:
                         message_sender = sender2.text
+                        if not self.is_crew_member(message_sender):
+                            continue
+            if do_contains_quote(str(tag)):
+                quote = tag.find("span", class_=find_quote(str(tag)))
+                if quote:
+                    message_quote_text = quote.text
+                    quote_sender = quote.parent.previous_sibling
+                    if quote_sender:
+                        quote_sender2 = quote_sender.find('span')
+                        if quote_sender2:
+                            message_quote_sender = quote_sender2.text
             if message:
                 message2 = message.find("span")
                 if message2:
@@ -260,10 +268,10 @@ class WhatsApp:
                 message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
             message_time = time.strptime(find_time(tag.text), time_format)
             # message_time = find_time(tag.text)
-            if message_text is not None:
+            if message_text is not '':
                 if new_sender:
                     cnt += 1
-                # TODO: Add Crew Member boolean to dictionary
+                # TODO: Separate ocr_captured from message_text?
                 dict_messages.update(
                     {cnt:
                          {'sender': message_sender,
@@ -284,17 +292,14 @@ class WhatsApp:
 
 if __name__ == '__main__':
     wa = WhatsApp(100, session="mysession")
-    watson = Watson()
     name = 'Genesis Best Grup'
     # name = 'KaVe Upwork'
     # name = 'Babam'
     name_sandbox = 'Genesis Bot Sandbox'
     dct_last_messages = wa.get_last_messages(name)
-
     messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages) + 1)]
     for message_to_read in messages_to_read:
-        break
-        message_to_send = watson.message_stateless(message_to_read, doPrint=True)
+        message_to_send = wa.Watson.message_stateless(message_to_read, doPrint=True)
         if message_to_send:
             # wa.send_message(name_sandbox, message_to_send['output']['generic'][0]['text'])
             pass

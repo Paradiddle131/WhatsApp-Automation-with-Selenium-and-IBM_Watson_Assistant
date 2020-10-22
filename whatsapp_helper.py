@@ -2,6 +2,14 @@ import re
 import datetime
 
 
+def find_emoji(text):
+    return re.compile(r'crossorigin="anonymous"').search(text)
+
+
+def do_contains_emoji(text):
+    return [x.group() for x in re.finditer(r'crossorigin="anonymous"', text)][0]
+
+
 def is_phone_number(text):
     return re.compile(r'^0*(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$').search(text)
 
