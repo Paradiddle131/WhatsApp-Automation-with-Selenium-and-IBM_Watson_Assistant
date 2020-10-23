@@ -4,6 +4,8 @@ from io import BytesIO
 import pygetwindow as gw
 import sys
 import time
+import logging
+import logging.config
 import datetime as dt
 import pandas as pd
 from PIL import Image
@@ -47,11 +49,15 @@ class WhatsApp:
             except:
                 # if previous session is left open, close it
                 gw.getWindowsWithTitle('WhatsApp - Google Chrome')[0].close()
+                logging.info("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
                 gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
+                logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)  # we are using chrome as our webbrowser
         else:
             self.browser = webdriver.Chrome()
+            logging.info("Chrome Driver is initialized successfully.")
         self.browser.get("https://web.whatsapp.com/")
+        logging.info("WhatsApp Web Client is opening...")
         # emoji.json is a json file which contains all the emojis
         with open("emoji.json") as emojies:
             self.emoji = json.load(emojies)  # This will load the emojies present in the json file into the dict
@@ -86,13 +92,17 @@ class WhatsApp:
             for msg in messages:
                 send_msg.send_keys(msg)
                 send_msg.send_keys(Keys.SHIFT + Keys.ENTER)
+                logging.info(f"Message \"{msg}\" is sent to \"{name}\"")
             send_msg.send_keys(Keys.ENTER)
             return True
         except TimeoutException:
+            logging.error("Exception occurred", exc_info=True)
             raise TimeoutError("Your request has been timed out! Try overriding timeout!")
         except NoSuchElementException:
+            logging.error("Exception occurred", exc_info=True)
             return False
         except Exception:
+            logging.error("Exception occurred", exc_info=True)
             return False
 
     def participants_count_for_group(self, group_name):
@@ -103,10 +113,13 @@ class WhatsApp:
                 (By.CSS_SELECTOR, f".{header_class_name}")))
             click_menu.click()
         except TimeoutException:
+            logging.error("Exception occurred", exc_info=True)
             raise TimeoutError("Your request has been timed out! Try overriding timeout!")
         except NoSuchElementException as e:
+            logging.error("Exception occurred", exc_info=True)
             return "None"
         except Exception as e:
+            logging.error("Exception occurred", exc_info=True)
             return "None"
         current_time = dt.datetime.now()
         participants_class = "_2y8MV"
@@ -114,14 +127,15 @@ class WhatsApp:
         time.sleep(5)
         try:
             list_participants_count = self.browser.find_elements_by_css_selector(participants_selector)
-            print("There are", list_participants_count[2].text, "participants in group", group_name)
+            logging.info("There are", list_participants_count[2].text, "participants in group", group_name)
             return list_participants_count[2].text
         except Exception as e:
-            print(e)
+            logging.error("Exception occurred", exc_info=True)
             pass
         new_time = dt.datetime.now()
         elapsed_time = (new_time - current_time).seconds
         if elapsed_time > self.timeout:
+            logging.warning(f"Timeout reached. {elapsed_time}/{self.timeout}")
             return "NONE"
 
     def get_group_participants(self, group_name):
@@ -131,12 +145,13 @@ class WhatsApp:
             click_menu = self.find_wait('.' + header_class_name, 'css')
             click_menu.click()
         except TimeoutException:
+            logging.error("Exception occurred", exc_info=True)
             raise TimeoutError("Your request has been timed out! Try overriding timeout!")
         except NoSuchElementException as e:
-            print(e)
+            logging.error("Exception occurred", exc_info=True)
             return "None"
         except Exception as e:
-            print(e)
+            logging.error("Exception occurred", exc_info=True)
             return "None"
         list_participants = []
 
@@ -164,7 +179,7 @@ class WhatsApp:
                         list_participants.append(i.text)
                 v += 1
             except Exception as e:
-                print(e)
+                logging.error("Exception occurred", exc_info=True)
                 pass
         return list_participants
 
@@ -181,7 +196,7 @@ class WhatsApp:
                     return self.browser.find_element_by_xpath(element_xpath + suffix), element_xpath + suffix
                 continue
             except:
-                print("Element couldn't be found.")
+                logging.warning(f"Element couldn't be found from xpath: {xpath}.", exc_info=True)
                 break
 
     def scroll_up_panel(self, scroll_times=20, element=None):
@@ -191,6 +206,7 @@ class WhatsApp:
             time.sleep(0.2)
             element.send_keys(Keys.ARROW_UP)
         time.sleep(3)
+        logging.info(f"Scrolled up for {scroll_times} times.")
 
     # extracts blob content as bytes
     def get_file_content_chrome(self, uri):
@@ -206,21 +222,31 @@ class WhatsApp:
         xhr.send();
         """, uri)
         if type(result) == int:
+            logging.error(f"Couldn't get element from blob content on Chrome. Uri is: {uri}", exc_info=True)
             raise Exception("Request failed with status %s" % result)
         return base64.b64decode(result)
 
     def bytes_to_image(self, bytes, image_name=None):
-        stream = BytesIO(bytes)
-        image = Image.open(stream).convert("RGBA")
-        stream.close()
-        if image_name:
-            image.save(f'output/image_{image_name}.png')
-        return image
+        try:
+            stream = BytesIO(bytes)
+            image = Image.open(stream).convert("RGBA")
+            stream.close()
+            if image_name:
+                image.save(f'output/image_{image_name}.png')
+            return image
+        except:
+            logging.error(f"Bytes couldn't converted into an image. Bytes: {bytes}", exc_info=True)
+            return None
 
     def is_crew_member(self, GSM):
-        GSM = GSM.split('+')[1] if '+' in GSM else GSM
-        df = pd.read_csv(self.participants_list_path)
-        return GSM in df['Vodafone_shops'].values
+        try:
+            GSM = GSM.split('+')[1] if '+' in GSM else GSM
+            df = pd.read_csv(self.participants_list_path)
+            logging.debug(f"GSM No: {GSM} is classified as crew member/trouble shooter successfully.")
+            return GSM in df['Vodafone_shops'].values
+        except:
+            logging.error(f"Error occurred during the Pandas DataFrame actions.", exc_info=True)
+            return None
 
     def get_last_messages(self, name):
         dict_messages = {}
@@ -231,6 +257,7 @@ class WhatsApp:
         cnt = 0
         message_text, message_sender = ['' for _ in range(2)]
         for tag in soup.find_all("div", class_="message-in"):
+            logging.debug(f"Tag is scraped: {tag}")
             new_sender = False
             # message_time, location = [None for _ in range(2)]
             message_quote_sender, message_quote_text = [None for _ in range(2)]
@@ -245,6 +272,7 @@ class WhatsApp:
                         message_sender = sender2.text
                         if not self.is_crew_member(message_sender):
                             continue
+                        logging.debug(f"Sender: \"{message_sender}\"")
             if do_contains_quote(str(tag)):
                 quote = tag.find("span", class_=find_quote(str(tag)))
                 if quote:
@@ -254,10 +282,12 @@ class WhatsApp:
                         quote_sender2 = quote_sender.find('span')
                         if quote_sender2:
                             message_quote_sender = quote_sender2.text
+                        logging.debug(f"Quote Sender: \"{message_quote_sender}\"")
             if message:
                 message2 = message.find("span")
                 if message2:
                     message_text = message_text + " | " + message2.text.replace("\n", ' ') if message_text != '' else message2.text.replace("\n", ' ')
+                    logging.debug(f"Message: \"{message_text}\"")
                     # location = self.browser.page_source.find(message2.text)
             if do_contains_image(str(tag)) \
                     and not do_contains_audio(str(tag)) \
@@ -266,10 +296,13 @@ class WhatsApp:
                 image_bytes = self.get_file_content_chrome(image_link)
                 # self.bytes_to_image(image_bytes, cnt)  # Save the image on output folder
                 message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
+                logging.debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
             message_time = time.strptime(find_time(tag.text), time_format)
+            logging.debug(f"Message time is captured as: \"{message_time}\"")
             # message_time = find_time(tag.text)
             if message_text is not '':
                 if new_sender:
+                    logging.debug(f"Consecutive messages from the same sender is detected.")
                     cnt += 1
                 # TODO: Separate ocr_captured from message_text?
                 dict_messages.update(
@@ -280,17 +313,23 @@ class WhatsApp:
                           'quote': {'sender': message_quote_sender,
                                     'message': message_quote_text}
                           }})
+        logging.info(f"Message object(s) successfully captured.")
         return dict_messages
 
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
         search.send_keys(chat_name + Keys.ENTER)
+        logging.info(f"Entered into the chat: \"{name}\".")
 
     def quit(self):
+        logging.info("Exiting Whatsapp Web...")
         self.browser.quit()
 
 
 if __name__ == '__main__':
+    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
+                        level=logging.DEBUG,
+                        format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(100, session="mysession")
     name = 'Genesis Best Grup'
     # name = 'KaVe Upwork'
