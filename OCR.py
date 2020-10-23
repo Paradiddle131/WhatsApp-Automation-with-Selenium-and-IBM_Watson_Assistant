@@ -44,16 +44,16 @@ class OCR:
                 [extracted_text.append(result[i]['description']) for i in range(len(result))]
                 logging.info(f"Text is extracted from the image successfully.")
                 return ' '.join(extracted_text[0].split("\n"))
-            except Exception as e:
-                logging.warning(f"\"textAnnotations\" couldn't retrieved from the result of Vision API. Result is -> {result}")
-                raise Exception(e)
+            except:
+                logging.warning(
+                    f"\"textAnnotations\" couldn't retrieved from the result of Vision API. Result is -> {result}, "
+                    f"Result.json() is -> {result.json()}")
+                return ''
 
 
 if __name__ == '__main__':
     ocr = OCR()
-    # image_path = 'img_to_ocr.png'
-    image_path = 'img_to_ocr_2.jpeg'
-    # image_path = 'not_ocrable.jpg'
+    image_path = 'biometrik_test.jpg'
     with open(image_path, 'rb') as f:
         image = f.read()
     print(ocr.image_to_text(image))

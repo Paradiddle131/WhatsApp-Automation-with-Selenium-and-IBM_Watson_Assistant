@@ -238,12 +238,11 @@ class WhatsApp:
             logging.error(f"Bytes couldn't converted into an image. Bytes: {bytes}", exc_info=True)
             return None
 
-    def is_crew_member(self, GSM):
+    def is_trouble_shooter(self, GSM):
         try:
             GSM = GSM.split('+')[1] if '+' in GSM else GSM
             df = pd.read_csv(self.participants_list_path)
-            logging.debug(f"GSM No: {GSM} is classified as crew member/trouble shooter successfully.")
-            return GSM in df['Vodafone_shops'].values
+            return GSM in df['Trouble_shooters'].values
         except:
             logging.error(f"Error occurred during the Pandas DataFrame actions.", exc_info=True)
             return None
@@ -270,9 +269,10 @@ class WhatsApp:
                     sender2 = sender.find('span')
                     if sender2:
                         message_sender = sender2.text
-                        if not self.is_crew_member(message_sender):
+                        if self.is_trouble_shooter(message_sender):
+                            logging.debug(f"GSM No: {message_sender} is classified as \"trouble shooter\". Skipping this message.")
                             continue
-                        logging.debug(f"Sender: \"{message_sender}\"")
+                        logging.debug(f"GSM No: {message_sender} is classified as \"crew member\".")
             if do_contains_quote(str(tag)):
                 quote = tag.find("span", class_=find_quote(str(tag)))
                 if quote:
