@@ -28,15 +28,6 @@ except ModuleNotFoundError:
     print(
         "Beautiful Soup Library is reqired to make this library work(For getting participants list for the specified group).\npip3 install beautifulsoup4")
 
-logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
-                    level=logging.DEBUG,
-                    format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
-logging.config.dictConfig({
-    'version': 1,
-    'disable_existing_loggers': True,
-})
-# TODO: filter external loggers
-
 RELOAD_TIMEOUT = 10
 ERROR_TIMEOUT = 5
 non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
@@ -322,7 +313,7 @@ class WhatsApp:
                           'quote': {'sender': message_quote_sender,
                                     'message': message_quote_text}
                           }})
-        logging.info(f"Message object is successfully captured.")
+        logging.info(f"Message object(s) successfully captured.")
         return dict_messages
 
     def enter_chat_screen(self, chat_name):
@@ -336,6 +327,9 @@ class WhatsApp:
 
 
 if __name__ == '__main__':
+    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
+                        level=logging.DEBUG,
+                        format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(100, session="mysession")
     name = 'Genesis Best Grup'
     # name = 'KaVe Upwork'

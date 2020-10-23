@@ -1,4 +1,5 @@
 import os
+import logging
 from dotenv import load_dotenv
 from ibm_watson import AssistantV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
@@ -21,7 +22,9 @@ class Watson():
 
         self.authenticator = IAMAuthenticator(self.ASSISTANT_IAM_APIKEY)
         self.ASSISTANT = self.create_assistant()
+        logging.info(f"IBM Watson Assistant session is created successfully.")
         self.auth()
+        logging.debug(f"IBM Watson Assistant session is authenticated successfully.")
 
     def create_assistant(self):
         return AssistantV2(
@@ -53,12 +56,14 @@ class Watson():
                 'text': text
             }
         ).get_result()
+        logging.debug(f"Response from IBM Watson -> {response}")
         try:
             if (len(response['output']['intents']) == 0 and
                 len(response['output']['entities']) == 0 and
                 len(response['output']['generic']) == 0) or \
                     response['output']['generic'][0]['response_type'] == 'suggestion' or \
                     'Çözüldü' in [entity['entity'] for entity in response['output']['entities']]:
+                logging.info(f"Nothing captured from text {text}.")
                 return ''
         except:
             pass
@@ -76,6 +81,7 @@ class Watson():
             assistant_reply = response['output']['generic'][0]['text']
             print(f"------------------------\nResponse of the text \"{text}\" is below:")
         except:
+            logging.warning(f"Couldn't retrieve any text response from IBM Watson Assistant.")
             pass  # No text response
         if len(intents) != 0:
             bot_reply.append("Captured Intent: " + intents[0]['intent'] + "\n")
@@ -83,6 +89,7 @@ class Watson():
             for entity in entities:
                 bot_reply.append("Captured Entity: " + entity['entity'] + " -> " + text[entity['location'][0]:entity['location'][1]] + "\n")
         bot_reply.append("Reply: " + assistant_reply) if assistant_reply is not '' else None
+        logging.debug(f"Bot reply is -> {bot_reply}")
         print(''.join(bot_reply))
 
 
