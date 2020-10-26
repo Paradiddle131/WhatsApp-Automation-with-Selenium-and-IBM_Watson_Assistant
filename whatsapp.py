@@ -1,26 +1,25 @@
 import base64
-from io import BytesIO
-
-import pygetwindow as gw
+import datetime as dt
+import logging.config
 import sys
 import time
-import logging
-import logging.config
-import datetime as dt
+from io import BytesIO
+
 import pandas as pd
+import pygetwindow as gw
 from PIL import Image
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from IBM_Watson_Assistant import Watson
-from whatsapp_helper import *
 from OCR import *
+from whatsapp_helper import *
 
 try:
     from bs4 import BeautifulSoup
@@ -33,6 +32,7 @@ ERROR_TIMEOUT = 5
 non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
 time_format = '%I:%M %p'
 path_home = os.getcwd()
+
 
 class WhatsApp:
     emoji = {}  # This dict will contain all emojies needed for chatting
@@ -270,7 +270,8 @@ class WhatsApp:
                     if sender2:
                         message_sender = sender2.text
                         if self.is_trouble_shooter(message_sender):
-                            logging.debug(f"GSM No: {message_sender} is classified as \"trouble shooter\". Skipping this message.")
+                            logging.debug(
+                                f"GSM No: {message_sender} is classified as \"trouble shooter\". Skipping this message.")
                             continue
                         logging.debug(f"GSM No: {message_sender} is classified as \"crew member\".")
             if do_contains_quote(str(tag)):
@@ -286,7 +287,9 @@ class WhatsApp:
             if message:
                 message2 = message.find("span")
                 if message2:
-                    message_text = message_text + " | " + message2.text.replace("\n", ' ') if message_text != '' else message2.text.replace("\n", ' ')
+                    message_text = message_text + " | " + message2.text.replace("\n",
+                                                                                ' ') if message_text != '' else message2.text.replace(
+                        "\n", ' ')
                     logging.debug(f"Message: \"{message_text}\"")
                     # location = self.browser.page_source.find(message2.text)
             if do_contains_image(str(tag)) \
