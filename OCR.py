@@ -43,17 +43,24 @@ class OCR:
                 result = result.json()['responses'][0]['textAnnotations']
                 [extracted_text.append(result[i]['description']) for i in range(len(result))]
                 logging.info(f"Text is extracted from the image successfully.")
-                return ' '.join(extracted_text[0].split("\n"))
+                return self.correct_typo(' '.join(extracted_text[0].split("\n")))
             except:
                 logging.warning(
                     f"\"textAnnotations\" couldn't retrieved from the result of Vision API. Result is -> {result}, "
                     f"Result.json() is -> {result.json()}")
                 return ''
 
+    def correct_typo(self, text):
+        logging.debug(f"Text before typo correction -> {text}")
+        if '$' in text:
+            text = text.replace('$', 'S')
+        logging.debug(f"Text after typo correction -> {text}")
+        return text
+
 
 if __name__ == '__main__':
     ocr = OCR()
-    image_path = 'biometrik_test.jpg'
+    image_path = 'input/okc_test.jpg'
     with open(image_path, 'rb') as f:
         image = f.read()
     print(ocr.image_to_text(image))
