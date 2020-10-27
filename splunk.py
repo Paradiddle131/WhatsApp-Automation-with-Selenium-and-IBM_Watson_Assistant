@@ -15,6 +15,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from splunk_helper import *
+
 
 class Splunk:
     timeout = 10
@@ -44,7 +46,7 @@ class Splunk:
             self.browser.find_element_by_xpath('//*[@id="username"]').send_keys(os.getenv('name'))
             self.browser.find_element_by_xpath('//*[@id="password"]').send_keys(os.getenv('password') + Keys.ENTER)
         except NoSuchElementException:
-            logging.warning("Sign in screen is not loaded.", exc_info=False)
+            logging.info("Sign in screen is not loaded.", exc_info=False)
             pass
 
     def find_wait(self, element_xpath, timeout=timeout, by='xpath'):
@@ -56,26 +58,26 @@ class Splunk:
         self.find_wait('ace_editor.ace-spl-light', by='class_name').click()
         self.find_wait('icon-chevron-right', by='class_name').click()
         self.find_wait('search-query.text-clear ', by='class_name').send_keys(keyword)
-        self.find_wait('search-link', 50, by='class_name').click()
+        self.find_wait('search-link', 70, by='class_name').click()
         self.find_wait('search-button', by='class_name').click()
-
         WebDriverWait(self.browser, 50).until(EC.presence_of_element_located(
             (By.CLASS_NAME, "contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas")))
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
-        tags = soup.find_all("tbody", attrs={"class": "shared-eventsviewer-list-body"})
-        cnt = 0
         dict_events = {}
         time.sleep(10)
-        for tag in tags:
-            logging.debug(f"Tag is scraped: {tag}")
+        tags = soup.find_all("tr", attrs={"class": "shared-eventsviewer-list-body-row"})
+        for cnt, tag in enumerate(tags):
             dict_event = {}
-            items = tag.find("div", class_="json-tree shared-jsontree").contents[5].find_all("span",
-                                                                                             class_="key level-1")
-            for item in items:
+            items = tag.find("div", class_="json-tree shared-jsontree") \
+                .contents[5].find_all("span", class_="key level-1")
+            if '{' == tag.find("span", attrs={"data-path": "RequestMessage"}).text[0]:  # JSON format
                 request = json.loads(tag.find("span", attrs={"data-path": "RequestMessage"}).text)
                 response = json.loads(tag.find("span", attrs={"data-path": "ResponseMessage"}).text)
+            else:  # Tag format
+                request = find_attribute_from_tag(tag.find("span", attrs={"data-path": "RequestMessage"}).text)
+                response = find_attribute_from_tag(tag.find("span", attrs={"data-path": "ResponseMessage"}).text)
+            for item in items:
                 key, value = item.contents[1].text, item.contents[3].text
-                logging.debug(f"Key-value pair found for event: {cnt} as: "+"{"+key+":"+" "+value+"}")
                 if key == 'RequestMessage':
                     dict_event.update(request)
                 elif key == 'ResponseMessage':
@@ -83,13 +85,13 @@ class Splunk:
                 else:
                     dict_event.update({key: value})
             dict_events.update({cnt: dict_event})
-            pprint(dict_events)
-        # TODO: scroll down to fetch new elements
-
+            logging.debug("Scraped event ->", dict_event)
+        return dict_events
+        # TODO: Make it run on multiple pages
 
 if __name__ == '__main__':
-    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='splunk.log')],
+    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='splunk.log', mode='w')],
                         level=logging.DEBUG,
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     splunk = Splunk(session="splunk-session")
-    splunk.search("ekos_40")
+    pprint(splunk.search("ekos_40"))
