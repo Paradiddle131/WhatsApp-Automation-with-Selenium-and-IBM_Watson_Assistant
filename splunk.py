@@ -1,6 +1,8 @@
+import json
 import logging.config
 import os
 import time
+from pprint import pprint
 
 import pygetwindow as gw
 from bs4 import BeautifulSoup
@@ -22,14 +24,14 @@ class Splunk:
         if session:
             chrome_options.add_argument("--user-data-dir={}".format(session))
             try:
-                self.browser = webdriver.Chrome(options=chrome_options)  # we are using chrome as our webbrowser
+                self.browser = webdriver.Chrome(options=chrome_options)
             except:
                 # if previous session is left open, close it
-                gw.getWindowsWithTitle('Home | Splunk 7.1.0')[0].close()
+                gw.getWindowsWithTitle('Search | Splunk 7.1.0')[0].close()
                 logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
                 gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
                 logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
-                self.browser = webdriver.Chrome(options=chrome_options)  # we are using chrome as our webbrowser
+                self.browser = webdriver.Chrome(options=chrome_options)
         else:
             self.browser = webdriver.Chrome()
         self.browser.get('http://10.86.71.216:8000')
@@ -63,16 +65,25 @@ class Splunk:
         tags = soup.find_all("tbody", attrs={"class": "shared-eventsviewer-list-body"})
         cnt = 0
         dict_events = {}
-        time.sleep(8)
+        time.sleep(10)
         for tag in tags:
             logging.debug(f"Tag is scraped: {tag}")
             dict_event = {}
             items = tag.find("div", class_="json-tree shared-jsontree").contents[5].find_all("span",
                                                                                              class_="key level-1")
             for item in items:
-                dict_event.update({item.contents[1].text: item.contents[3].text})
+                request = json.loads(tag.find("span", attrs={"data-path": "RequestMessage"}).text)
+                response = json.loads(tag.find("span", attrs={"data-path": "ResponseMessage"}).text)
+                key, value = item.contents[1].text, item.contents[3].text
+                logging.debug(f"Key-value pair found for event: {cnt} as: "+"{"+key+":"+" "+value+"}")
+                if key == 'RequestMessage':
+                    dict_event.update(request)
+                elif key == 'ResponseMessage':
+                    dict_event.update(response)
+                else:
+                    dict_event.update({key: value})
             dict_events.update({cnt: dict_event})
-            print(dict_events)
+            pprint(dict_events)
         # TODO: scroll down to fetch new elements
 
 
