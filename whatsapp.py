@@ -40,7 +40,7 @@ class WhatsApp:
     timeout = 10  # The timeout is set for about ten seconds
 
     # This constructor will load all the emojies present in the json file and it will initialize the webdriver
-    def __init__(self, wait, screenshot=None, session=None):
+    def __init__(self, initialize_whatsapp=True, wait=100, screenshot=None, session=None):
         chrome_options = Options()
         if session:
             chrome_options.add_argument("--user-data-dir={}".format(session))
@@ -56,21 +56,25 @@ class WhatsApp:
         else:
             self.browser = webdriver.Chrome()
             logging.info("Chrome Driver is initialized successfully.")
-        self.browser.get("https://web.whatsapp.com/")
-        logging.info("WhatsApp Web Client is opening...")
-        # emoji.json is a json file which contains all the emojis
-        with open("emoji.json") as emojies:
-            self.emoji = json.load(emojies)  # This will load the emojies present in the json file into the dict
-        WebDriverWait(self.browser, wait).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, '._3FRCZ')))
-        if screenshot is not None:
-            self.browser.save_screenshot(screenshot)  # This will save the screenshot to the specified file location
-        # CSS SELECTORS AND XPATHS
-        self.search_selector = ".cBxw- > div:nth-child(2)"
-        self.browser.maximize_window()
-        self.OCR = OCR()
-        self.Watson = Watson()
-        self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
+        if initialize_whatsapp:
+            self.browser.get("https://web.whatsapp.com/")
+            logging.info("WhatsApp Web Client is opening...")
+            # emoji.json is a json file which contains all the emojis
+            with open("emoji.json") as emojies:
+                self.emoji = json.load(emojies)  # This will load the emojies present in the json file into the dict
+            WebDriverWait(self.browser, wait).until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, '._3FRCZ')))
+            if screenshot is not None:
+                self.browser.save_screenshot(screenshot)  # This will save the screenshot to the specified file location
+            # CSS SELECTORS AND XPATHS
+            self.search_selector = ".cBxw- > div:nth-child(2)"
+            self.browser.maximize_window()
+            self.OCR = OCR()
+            self.Watson = Watson()
+            self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
+
+    def get_driver(self):
+        return self.browser
 
     # This method is used to emojify all the text emoji's present in the message
     def emojify(self, message):
@@ -333,7 +337,7 @@ if __name__ == '__main__':
     logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
                         level=logging.DEBUG,
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
-    wa = WhatsApp(100, session="mysession")
+    wa = WhatsApp(session="mysession")
     name = 'Genesis Best Grup'
     # name = 'KaVe Upwork'
     # name = 'Babam'
