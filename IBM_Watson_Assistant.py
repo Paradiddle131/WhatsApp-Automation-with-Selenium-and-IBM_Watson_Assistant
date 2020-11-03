@@ -69,6 +69,9 @@ class Watson():
             pass
         if doPrint:
             self.print_reply_with_intent(response, text)
+        entities = response['output']['entities']
+        [response['output']['entities'][i].update(
+            {'text': text[entity['location'][0]: entity['location'][1]]}) for i, entity in enumerate(entities)]
         return response
 
     def print_reply_with_intent(self, response, text=''):
@@ -92,13 +95,3 @@ class Watson():
         bot_reply.append("Reply: " + assistant_reply) if assistant_reply is not '' else None
         logging.debug(f"Bot reply is -> {bot_reply}")
         print(''.join(bot_reply))
-
-
-if __name__ == '__main__':
-    watson = Watson()
-    # watson.message_stateless('OKC den fatura alamıyoruz', doPrint=True)
-    # watson.message_stateless('teşekkürler', doPrint=True)
-    # watson.message_stateless('1-144E32PT6 Cihaz order açıkta kaldı ön ödemede var yardım alabilirmiyim tamamlanması için', doPrint=True)
-    # watson.message_stateless('Ekos gönderemiyoruz bir sıkıntı mı var acaba', doPrint=True)  # Entity: Ekos
-    # watson.message_stateless('1-3153413056904 nolu hizmet talebi için yardımınızı rica ederim', doPrint=True)  # Entity: TalepNo  Found TalepNo KayitNo GSMNo
-    watson.message_stateless('5303474211 nolu numaraya tabletten yapılan teklif onaylanıp sms gelmesine rağmen prm e dusmedi', doPrint=True)  # Entity: PRM Intent: PRMeDüşmedi
