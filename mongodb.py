@@ -24,5 +24,14 @@ if __name__ == '__main__':
 
     post1 = {"name": "lasagna"}
     post2 = {"_id": 5, "name": "joe"}
+    post3 = {'sample1': {
+        "message": "sample-message",
+        "sender": "905001234567",
+        "time": "03:14",
+        "ibm": {
+            "intent": "",
+            "entity": "sample-entity"
+        }
+    }}
 
-    x = mongo.insert(post1)
+    x = mongo.insert(post3)

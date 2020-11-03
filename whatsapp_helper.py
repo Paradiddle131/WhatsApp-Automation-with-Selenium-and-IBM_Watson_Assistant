@@ -1,5 +1,5 @@
 import re
-import datetime
+from datetime import datetime
 
 
 def find_emoji(text):
@@ -27,11 +27,14 @@ def find_audio(text):
 
 
 def do_contains_quoted_image(text):
-    return re.compile(r'background-image: url\("blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"\);').search(text)
+    return re.compile(
+        r'background-image: url\("blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"\);').search(text)
 
 
 def find_quoted_image(text):
-    return [x.group() for x in re.finditer(r'background-image: url\("blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"\);', text)][0]
+    return [x.group() for x in
+            re.finditer(r'background-image: url\("blob:https://web.whatsapp.com/\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"\);',
+                        text)][0]
 
 
 def do_contains_image(text):
@@ -66,12 +69,21 @@ def find_time(text):
     return [x.group() for x in re.finditer(r'(\d|1[0-2]):([0-5]\d) (am|pm)', text)][0]
 
 
-def valid_date(datestring):
+def find_date(text):
+     return [x.group() for x in re.finditer(r'\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b', text)][0]
+
+
+def valid_date(date_string):
     try:
-        mat = re.match(r'(\d{2})[/.-](\d{2})[/.-](\d{4})$', datestring)
+        mat = re.match(r'(\d{2})[/.-](\d{2})[/.-](\d{4})$', date_string)
         if mat is not None:
-            datetime.datetime(*(map(int, mat.groups()[-1::-1])))
+            datetime(*(map(int, mat.groups()[-1::-1])))
             return True
     except ValueError:
         pass
     return False
+
+
+def str_to_datetime(date_string):
+    """Ex: '02/11/2020 2:25 pm'"""
+    return datetime.strptime(date_string, '%d/%m/%Y %I:%M %p')
