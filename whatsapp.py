@@ -3,6 +3,7 @@ import datetime as dt
 import logging.config
 import sys
 import time
+from pprint import pprint
 from io import BytesIO
 
 import pandas as pd
@@ -323,6 +324,73 @@ class WhatsApp:
         logging.info(f"Message object(s) successfully captured.")
         return dict_messages
 
+    def check_new_message(self, name):
+        self.enter_chat_screen(name)
+        cnt = 0
+        message_text, message_sender, message_date, message_time, message_info = ['' for _ in range(5)]
+        last_tag = None
+        dict_messages = {}
+        while True:
+            try:
+                soup = BeautifulSoup(self.browser.page_source, "html.parser")
+                tag = soup.find_all("div", class_="message-out")[-1]
+                tag_text = tag.find_all("div", class_="copyable-text")
+                if tag != last_tag:
+                    logging.debug(f"New message received at: {time.time()}")
+                    last_tag = tag
+                    if tag_text:
+                        tag_text = tag_text[-1]
+                        message_info = tag_text.attrs["data-pre-plain-text"]
+                        message_date = str_to_datetime(find_date(message_info) + ' ' + find_time(message_info))
+                        message_sender = message_info.split(']')[1][1:].split(':')[0]
+                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n", ' ')
+                    logging.debug(f"Message: \"{message_text}\"")
+                    message_quote_sender, message_quote_text = [None for _ in range(2)]
+                    if do_contains_quote(str(tag)):
+                        quote = tag.find("span", class_=find_quote(str(tag)))
+                        if quote:
+                            message_quote_text = quote.text.replace("\n", ' ')
+                            quote_sender = quote.parent.previous_sibling
+                            if quote_sender:
+                                quote_sender2 = quote_sender.find('span')
+                                if quote_sender2:
+                                    message_quote_sender = quote_sender2.text
+                                logging.debug(f"Quote Sender: \"{message_quote_sender}\"")
+                    if do_contains_image(str(tag)) \
+                            and not do_contains_audio(str(tag)) \
+                            and not do_contains_quoted_image(str(tag)):
+                        image_link = find_image(str(tag))
+                        image_bytes = self.get_file_content_chrome(image_link)
+                        # self.bytes_to_image(image_bytes, cnt)  # Save the image on output folder
+                        message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
+                        logging.debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
+                    watson_response = self.Watson.message_stateless(message_text, doPrint=True)
+                    if watson_response:
+                        [self.check_splunk() if entity['entity'] == "BayiKodu" else '' for entity in watson_response['output']['entities']]
+                    dict_messages.update(
+                        {cnt:
+                             {'sender': message_sender,
+                              'message': message_text,
+                              'datetime': message_date,
+                              'quote': {'sender': message_quote_sender,
+                                        'message': message_quote_text},
+                              'watson_response': watson_response
+                              }})
+                    pprint(dict_messages)
+                else:
+                    print("Sleeping for 3 seconds...")
+                    time.sleep(3)
+                    logging.info("Slept for 3 seconds since there is no new message.")
+            except:
+                logging.warning(f"Some problem has occured.", exc_info=True)
+                print("Something wrong happened during the loop.")
+                time.sleep(3)
+                pass
+
+    def check_splunk(self):
+        print("TODO: Check Splunk")
+        pass
+
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
         search.send_keys(chat_name + Keys.ENTER)
@@ -338,15 +406,19 @@ if __name__ == '__main__':
                         level=logging.DEBUG,
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(session="mysession")
-    name = 'Genesis Best Grup'
+    # name = 'Genesis Best Grup'
+    name = 'Genesis Bot Sandbox'
     # name = 'KaVe Upwork'
     # name = 'Babam'
-    name_sandbox = 'Genesis Bot Sandbox'
-    dct_last_messages = wa.get_last_messages(name)
-    messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages) + 1)]
-    for message_to_read in messages_to_read:
-        message_to_send = wa.Watson.message_stateless(message_to_read, doPrint=True)
-        if message_to_send:
-            # wa.send_message(name_sandbox, message_to_send['output']['generic'][0]['text'])
-            pass
+    # name_sandbox = 'Genesis Bot Sandbox'
+    wa.check_new_message(name)
+    # dct_last_messages = wa.get_last_messages(name)
+    # messages_to_read = [dct_last_messages[i]['message'] for i in range(1, len(dct_last_messages) + 1)]
+    # pprint(dct_last_messages)
+
+    # for message_to_read in messages_to_read:
+    #     message_to_send = wa.Watson.message_stateless(message_to_read, doPrint=True)
+    #     if message_to_send:
+    #         # wa.send_message(name_sandbox, message_to_send['output']['generic'][0]['text'])
+    #         pass
     wa.quit()
