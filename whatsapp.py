@@ -20,6 +20,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from IBM_Watson_Assistant import Watson
 from OCR import *
+from mongodb import MongoDB
 from whatsapp_helper import *
 
 try:
@@ -72,6 +73,7 @@ class WhatsApp:
             self.browser.maximize_window()
             self.OCR = OCR()
             self.Watson = Watson()
+            self.Mongo = MongoDB()
             # self.Splunk = Splunk()
             self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
 
@@ -338,17 +340,13 @@ class WhatsApp:
             logging.debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
         return message_text
 
-    def get_sender_from_tag(self, tag):
-        message_sender = ''
-        if do_contains_sender(str(tag)):
-            sender = tag.find("div", class_=find_sender(str(tag))).find('span')
-            if sender:
-                message_sender = sender.text
-                if self.is_trouble_shooter(message_sender):
-                    logging.debug(
-                        f"GSM No: {message_sender} is classified as \"trouble shooter\". Skipping this message.")
-                    return None
-                logging.debug(f"GSM No: {message_sender} is classified as \"crew member\".")
+    def get_sender_from_messageId(self, messageId):
+        message_sender = find_phone_number(messageId)
+        if self.is_trouble_shooter(message_sender):
+            logging.debug(
+                f"GSM No: {message_sender} is classified as \"trouble shooter\". Skipping this message.")
+            return None
+        logging.debug(f"GSM No: {message_sender} is classified as \"crew member\".")
         return message_sender
 
     def get_time_from_tag(self, tag):
@@ -367,14 +365,18 @@ class WhatsApp:
     def check_new_message(self, name):
         global cnt
         self.enter_chat_screen(name)
+        time.sleep(4)
         message_text, message_sender, message_datetime, message_time, message_info = ['' for _ in range(5)]
         last_tag = None
         dict_messages = {}
         while True:
             try:
-                time.sleep(2)
                 soup = BeautifulSoup(self.browser.page_source, "html.parser")
                 tag = soup.find_all("div", class_="message-out")[-1]
+                message_id = tag.attrs["data-id"]
+                message_sender = self.get_sender_from_messageId(message_id)
+                if message_sender is None:
+                    continue
                 tag_text = tag.find_all("div", class_="copyable-text")
                 if tag != last_tag:
                     logging.debug(f"New message received at: {time.time()}")
@@ -383,30 +385,25 @@ class WhatsApp:
                         tag_text = tag_text[-1]
                         message_info = tag_text.attrs["data-pre-plain-text"]
                         message_datetime = str_to_datetime(find_date(message_info) + ' ' + find_time(message_info))
-                        message_sender = message_info.split(']')[1][1:].split(':')[0]
                         message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n", ' ')
                     else:
-                        message_sender = self.get_sender_from_tag(tag)
-                        if message_sender is None:
-                            continue
                         message_datetime = self.get_time_from_tag(tag)
                     logging.debug(f"Message: \"{message_text}\"")
                     message_quote_sender, message_quote_text = self.get_quote_from_tag(tag)
                     message_text = self.get_ocr_from_tag(tag, message_text)
                     watson_response = self.Watson.message_stateless(message_text, doPrint=True)
-                    # if watson_response:
-                        # TODO: mongodb insert
                     dict_messages.update(
-                        {cnt:
-                             {'sender': message_sender,
-                              'message': message_text,
-                              'datetime': message_datetime,
-                              'quote': {'sender': message_quote_sender,
-                                        'message': message_quote_text},
-                              'watson_response': watson_response
-                              }})
-                    pprint(dict_messages)
-                    return dict_messages
+                        {"_id": message_id,
+                         'sender': message_sender,
+                         'message': message_text,
+                         'datetime': message_datetime,
+                         'quote': {'sender': message_quote_sender,
+                                   'message': message_quote_text},
+                         'watson_response': watson_response
+                         })
+                    logging.debug("Final Message Dictionary ->", dict_messages)
+                    # pprint(dict_messages)
+                    self.Mongo.insert(dict_messages)
                 else:
                     print("Sleeping for 3 seconds...")
                     time.sleep(3)

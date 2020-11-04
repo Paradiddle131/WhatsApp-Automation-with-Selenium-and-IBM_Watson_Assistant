@@ -11,11 +11,11 @@ def do_contains_emoji(text):
 
 
 def is_phone_number(text):
-    return re.compile(r'^0*(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$').search(text)
+    return re.compile(r'\+*9*0*5([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})').search(text)
 
 
 def find_phone_number(text):
-    return [x.group() for x in re.finditer(r'^0*(5)([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})$', text)][0]
+    return [x.group() for x in re.finditer(r'\+*9*0*5([0-9]{2})\s?([0-9]{3})\s?([0-9]{2})\s?([0-9]{2})', text)][0]
 
 
 def do_contains_audio(text):
