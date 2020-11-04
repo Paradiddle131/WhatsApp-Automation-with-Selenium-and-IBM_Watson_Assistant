@@ -18,10 +18,32 @@ from selenium.webdriver.support.ui import WebDriverWait
 from splunk_helper import *
 
 
+def get_error_code(response):
+    try:
+        error_code = response['Response']['Header']['ErrorCode']['dialect']
+    except:
+        error_code = response['Response']['ResponseCode=']
+    logging.info(f"Error code: {error_code} found")
+    return error_code
+
+
+def get_merchantId(response):
+    try:
+        merchantId = response['Request']['MerchantId=']
+    except:
+        merchantId = ''
+        logging.warning(f"Error finding merchantId", exc_info=True)
+    logging.debug(f"MerchantId: {merchantId} found on splunk logs.")
+    return merchantId
+
+
 class Splunk:
     timeout = 10
 
-    def __init__(self, session=None):
+    def __init__(self, initialize_splunk=True, session=None):
+        logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='splunk.log')],
+                            level=logging.DEBUG,
+                            format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
         load_dotenv(os.path.join(os.getcwd(), 'splunk-credentials.env'))
         chrome_options = Options()
         if session:
@@ -37,14 +59,15 @@ class Splunk:
                 self.browser = webdriver.Chrome(options=chrome_options)
         else:
             self.browser = webdriver.Chrome()
-        self.browser.get(os.getenv('URL'))
-        self.browser.maximize_window()
-        self.sign_in()
+        if initialize_splunk:
+            self.browser.get(os.getenv('URL'))
+            self.browser.maximize_window()
+            self.sign_in()
 
     def sign_in(self):
         try:
             self.browser.find_element_by_xpath('//*[@id="username"]').send_keys(os.getenv('name'))
-            self.browser.find_element_by_xpath('//*[@id="password"]').send_keys(os.getenv('password') + Keys.ENTER)
+            self.browser.find_element_by_xpath('//*[@id="password"]').send_keys(os.getenv('password_splunk') + Keys.ENTER)
         except NoSuchElementException:
             logging.info("Sign in screen is not loaded.", exc_info=False)
             pass
@@ -89,23 +112,6 @@ class Splunk:
             logging.debug("Scraped event ->", dict_event)
         return dict_events
 
-    def get_merchantId(self, dict):
-        try:
-            merchantId = dict['Request']['MerchantId=']
-        except:
-            merchantId = ''
-            logging.warning(f"Error finding merchantId", exc_info=True)
-        logging.info(f"MerchantId: {merchantId} found")
-        return merchantId
-
-    def get_error_code(self, dict):
-        try:
-            error_code = dict['Response']['Header']['ErrorCode']['dialect']
-        except:
-            error_code = dict['Response']['ResponseCode=']
-        logging.info(f"Error code: {error_code} found")
-        return error_code
-
     def compare_merchantIds(self, response_watson):
         error_code, merchantId = ['' for _ in range(2)]
         for entity in response_watson['output']['entities']:
@@ -114,18 +120,13 @@ class Splunk:
             elif entity['entity'] == "BayiKodu":
                 merchantId = entity['text']
         response_splunk = self.search(error_code)
-        if merchantId == self.get_merchantId(response_splunk):
-            logging.debug(f"MerchantIds match.")
-        else:
-            logging.debug(f"MerchantIds do not match.")
+        [logging.debug(f"MerchantId {merchantId} matches with splunk log.")
+         if merchantId == get_merchantId(response_splunk[i])
+         else logging.debug(f"MerchantId {merchantId} does not match with any splunk log.")
+         for i in response_splunk]
         logging.info(f"Error code: {error_code}\nMerchantId: {merchantId}")
 
 
 if __name__ == '__main__':
-    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='splunk.log', mode='w')],
-                        level=logging.DEBUG,
-                        format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     splunk = Splunk(session="splunk-session")
-    # splunk.search(os.getenv("query1"))
-    splunk.compare_merchantIds(os.getenv("query1"))
-    # pprint(splunk.search(os.getenv("query1")))
+    pprint(splunk.search(os.getenv("query1")))

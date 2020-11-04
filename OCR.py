@@ -60,7 +60,7 @@ class OCR:
 
 if __name__ == '__main__':
     ocr = OCR()
-    image_path = 'input/okc_test.jpg'
+    image_path = 'input/90cw.jpeg'
     with open(image_path, 'rb') as f:
         image = f.read()
     print(ocr.image_to_text(image))

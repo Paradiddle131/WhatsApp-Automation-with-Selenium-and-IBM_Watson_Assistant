@@ -91,7 +91,7 @@ class Watson():
         if len(entities) != 0:
             for entity in entities:
                 logging.debug(f"Entity found on location: {entity['location']}")
-                bot_reply.append("Captured Entity: " + entity['entity'] + " -> " + text[entity['location'][0]:entity['location'][1]] + "\n")
+                bot_reply.append("Captured Entity: " + entity['entity'] + " -> " + text[entity['location'][0]-1:entity['location'][1]] + "\n")
         bot_reply.append("Reply: " + assistant_reply) if assistant_reply is not '' else None
         logging.debug(f"Bot reply is -> {bot_reply}")
         print(''.join(bot_reply))

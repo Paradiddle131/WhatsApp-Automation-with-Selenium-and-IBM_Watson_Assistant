@@ -73,8 +73,7 @@ class WhatsApp:
             self.browser.maximize_window()
             self.OCR = OCR()
             self.Watson = Watson()
-            self.Mongo = MongoDB()
-            # self.Splunk = Splunk()
+            self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=False)
             self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
 
     def get_driver(self):
@@ -362,7 +361,7 @@ class WhatsApp:
                 logging.debug(f"Quote Sender: \"{message_quote_sender}\"")
         return message_quote_sender, message_quote_text
 
-    def check_new_message(self, name):
+    def check_new_message(self, name, forever=True):
         global cnt
         self.enter_chat_screen(name)
         time.sleep(4)
@@ -404,6 +403,8 @@ class WhatsApp:
                     logging.debug("Final Message Dictionary ->", dict_messages)
                     # pprint(dict_messages)
                     self.Mongo.insert(dict_messages)
+                    if not forever:
+                        break
                 else:
                     print("Sleeping for 3 seconds...")
                     time.sleep(3)
@@ -430,5 +431,5 @@ if __name__ == '__main__':
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(session="mysession")
     name = 'Genesis Bot Sandbox'
-    wa.check_new_message(name)
+    wa.check_new_message(name, forever=False)
     wa.quit()
