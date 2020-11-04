@@ -3,6 +3,7 @@ import datetime as dt
 import logging.config
 import sys
 import time
+import argparse
 from io import BytesIO
 from pprint import pprint
 
@@ -361,7 +362,7 @@ class WhatsApp:
                 logging.debug(f"Quote Sender: \"{message_quote_sender}\"")
         return message_quote_sender, message_quote_text
 
-    def check_new_message(self, name, forever=True):
+    def check_new_message(self, name, run_forever=True):
         global cnt
         self.enter_chat_screen(name)
         time.sleep(4)
@@ -402,18 +403,22 @@ class WhatsApp:
                          })
                     logging.debug("Final Message Dictionary ->", dict_messages)
                     # pprint(dict_messages)
-                    self.Mongo.insert(dict_messages)
-                    if not forever:
+                    try:
+                        self.Mongo.insert(dict_messages)
+                    except:
+                        logging.warning(f"Tried to insert into mongo but error occured.", exc_info=True)
+                    if not run_forever:
+                        logging.info("breaking due to lac of passed argument: run_forever")
+                        print("breaking due to lac of passed argument: run_forever")
                         break
                 else:
                     print("Sleeping for 3 seconds...")
                     time.sleep(3)
                     logging.info("Slept for 3 seconds since there is no new message.")
             except:
-                logging.warning(f"Some problem has occured.", exc_info=True)
+                logging.error(f"Some problem has occured.", exc_info=True)
                 print("Something wrong happened during the loop.")
-                time.sleep(3)
-                pass
+                break
 
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
@@ -426,10 +431,14 @@ class WhatsApp:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-rf', '--run_forever', dest='run_forever', action='store_true',
+                        help='running forever or not')
+    args = parser.parse_args()
     logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
                         level=logging.DEBUG,
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(session="mysession")
     name = 'Genesis Bot Sandbox'
-    wa.check_new_message(name, forever=False)
+    wa.check_new_message(name, run_forever=args.run_forever)
     wa.quit()

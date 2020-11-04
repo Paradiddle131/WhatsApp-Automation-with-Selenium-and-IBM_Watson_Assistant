@@ -71,7 +71,7 @@ class Watson():
             self.print_reply_with_intent(response, text)
         entities = response['output']['entities']
         [response['output']['entities'][i].update(
-            {'text': text[entity['location'][0]: entity['location'][1]]}) for i, entity in enumerate(entities)]
+            {'text': text[entity['location'][0]-1: entity['location'][1]-1]}) for i, entity in enumerate(entities)]
         return response
 
     def print_reply_with_intent(self, response, text=''):

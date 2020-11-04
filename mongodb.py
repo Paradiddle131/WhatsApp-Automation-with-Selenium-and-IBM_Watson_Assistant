@@ -53,3 +53,4 @@ if __name__ == '__main__':
     }}
     # mongo.insert(post3)
     mongo.listen()
+    # TODO: Implement listen method for splunk that fetches new logs

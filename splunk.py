@@ -57,9 +57,8 @@ class Splunk:
                 gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
                 logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)
-        else:
-            self.browser = webdriver.Chrome()
         if initialize_splunk:
+            self.browser = webdriver.Chrome()
             self.browser.get(os.getenv('URL'))
             self.browser.maximize_window()
             self.sign_in()
