@@ -71,7 +71,9 @@ class WhatsApp:
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--headless')
             chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.binary_location = os.environ.get('GOOGLE_CHROME_PATH')
+            chrome_options.add_argument(
+                "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36")
+            chrome_options.binary_location = os.environ.get('GOOGLE_CHROME_BIN')
             try:
                 self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'), chrome_options=chrome_options)
             except:
@@ -484,14 +486,16 @@ class WhatsApp:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-rf', '--run_forever', dest='run_forever', action='store_true',
-                        help='running forever or not')
-    args = parser.parse_args()
-    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
-                        level=logging.DEBUG,
-                        format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
-    wa = WhatsApp(session="mysession")
-    name = 'Genesis Bot Sandbox'
-    wa.check_new_message(name, run_forever=args.run_forever)
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('-rf', '--run_forever', dest='run_forever', action='store_true',
+    #                     help='running forever or not')
+    # args = parser.parse_args()
+    # logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
+    #                     level=logging.DEBUG,
+    #                     format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
+    # wa = WhatsApp(session="mysession")
+    # name = 'Genesis Bot Sandbox'
+    # wa.check_new_message(name, run_forever=args.run_forever)
+    # wa.quit()
+    wa = WhatsApp()
     wa.quit()
