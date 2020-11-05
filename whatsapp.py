@@ -1,8 +1,8 @@
 import base64
 import time
+import os
 from io import BytesIO
-
-import pandas as pd
+from pandas import read_csv
 from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -12,14 +12,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from IBM_Watson_Assistant import Watson
-from OCR import *
+from OCR import OCR
 from mongodb import MongoDB
 from whatsapp_helper import *
 
-try:
-    import pygetwindow as gw
-except NotImplementedError:
-    isLinux = True
+
 try:
     from bs4 import BeautifulSoup
 except ModuleNotFoundError:
@@ -83,14 +80,8 @@ class WhatsApp:
                 self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'),
                                                 chrome_options=chrome_options)
             except:
-                if isLinux:
-                    os.system("TASKKILL /F /IM chrome.exe")
-                else:
-                    # if previous session is left open, close it
-                    gw.getWindowsWithTitle('WhatsApp - Google Chrome')[0].close()
-                    print("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
-                    gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
-                    print("Session is already open. \"New Tab - Google Chrome\" is closing...")
+                os.system("TASKKILL /F /IM chrome.exe")
+                print("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'),
                                                 chrome_options=chrome_options)
         else:
@@ -187,7 +178,7 @@ class WhatsApp:
     def is_trouble_shooter(self, GSM):
         try:
             GSM = GSM.split('+')[1] if '+' in GSM else GSM
-            df = pd.read_csv(self.participants_list_path)
+            df = read_csv(self.participants_list_path)
             return GSM in df['Trouble_shooters'].values
         except:
             print(f"Error occurred during the Pandas DataFrame actions.")
