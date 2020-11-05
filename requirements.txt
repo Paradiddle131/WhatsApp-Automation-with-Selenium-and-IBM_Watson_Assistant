@@ -12,3 +12,5 @@ requests~=2.24.0
 PyMongo~=3.11.0
 pymongo[srv]~=3.11.0
 argparse~=1.4.0
+Flask~=1.1.1
+gunicorn~=19.9.0
