@@ -57,7 +57,7 @@ class Splunk:
             chrome_options.add_argument('--no-sandbox')
             chrome_options.binary_location = GOOGLE_CHROME_PATH
             try:
-                self.browser = webdriver.Chrome(execution_path=CHROMEDRIVER_PATH, chrome_options=chrome_options)
+                self.browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, chrome_options=chrome_options)
             except:
                 if isLinux:
                     os.system("TASKKILL /F /IM chrome.exe")
@@ -67,7 +67,7 @@ class Splunk:
                     logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
                     gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
                     logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
-                self.browser = webdriver.Chrome(execution_path=CHROMEDRIVER_PATH, chrome_options=chrome_options)
+                self.browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, chrome_options=chrome_options)
         if initialize_splunk:
             self.browser = webdriver.Chrome()
             self.browser.get(os.getenv('URL'))
