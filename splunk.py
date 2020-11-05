@@ -19,6 +19,7 @@ try:
     import pygetwindow as gw
 except NotImplementedError:
     isLinux = True
+path_home = os.getcwd()
 
 
 def get_error_code(response):
@@ -52,7 +53,7 @@ class Splunk:
         if session:
             chrome_options.add_argument("--user-data-dir={}".format(session))
             try:
-                self.browser = webdriver.Chrome(options=chrome_options)
+                self.browser = webdriver.Chrome(os.path.join(path_home, 'chromedriver.exe'), options=chrome_options)
             except:
                 if isLinux:
                     os.system("TASKKILL /F /IM chrome.exe")
@@ -62,7 +63,7 @@ class Splunk:
                     logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
                     gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
                     logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
-                self.browser = webdriver.Chrome(options=chrome_options)
+                self.browser = webdriver.Chrome(os.path.join(path_home, 'chromedriver.exe'), options=chrome_options)
         if initialize_splunk:
             self.browser = webdriver.Chrome()
             self.browser.get(os.getenv('URL'))
