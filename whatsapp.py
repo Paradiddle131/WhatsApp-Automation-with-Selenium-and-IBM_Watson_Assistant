@@ -108,9 +108,9 @@ class WhatsApp:
             self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
 
     def get_qr(self):
-        time.sleep(3)
         try:
-            element = self.browser.find_element_by_xpath('//canvas[@aria-label = "Scan me!"]')
+            element = WebDriverWait(self.browser, 20).until(EC.presence_of_element_located(
+                (By.XPATH, '//canvas[@aria-label = "Scan me!"]')))
         except:
             print("No QR Code.")
             return
