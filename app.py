@@ -14,7 +14,7 @@ class Service(Thread):
 
 
 s1 = Service()
-WhatsApp = whatsapp.WhatsApp()
+WhatsApp = whatsapp.WhatsApp(session="mysession")
 
 
 # def print_message_on_web(message):
@@ -44,6 +44,8 @@ def forever(message):
 def serve():
     s1.start()
     whatsapp.setup()
+    name = 'Genesis Bot Sandbox'
+    WhatsApp.enter_chat_screen(name)
     return 'service started.<br><br>To Stop Click <a href="./stop">here</a><br><br>To start fetching messages,' \
            'Click <a href="./forever">here</a>'
 

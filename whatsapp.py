@@ -53,9 +53,6 @@ def setup():
     logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
                         level=logging.DEBUG,
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
-    wa = WhatsApp(session="mysession")
-    name = 'Genesis Bot Sandbox'
-    wa.enter_chat_screen(name)
     # wa.check_new_message(name, run_forever=run_forever)
     # wa.quit()
 
@@ -72,6 +69,8 @@ class WhatsApp:
             chrome_options.add_argument("--user-data-dir={}".format(session))
             chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.binary_location = os.environ.get('GOOGLE_CHROME_PATH')
             try:
                 self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'), chrome_options=chrome_options)
