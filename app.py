@@ -1,18 +1,12 @@
 from flask import Flask, render_template
+from os import remove
 import time
 import random
 import whatsapp
-from threading import Thread
 
 app = Flask(__name__)
 
 
-class Service(Thread):
-    def run(self):
-        whatsapp.start()
-
-
-s1 = Service()
 WhatsApp = whatsapp.WhatsApp(session="mysession")
 
 
@@ -30,7 +24,6 @@ def forever():
 
 @app.route("/start")
 def serve():
-    s1.start()
     name = 'Genesis Bot Sandbox'
     WhatsApp.enter_chat_screen(name)
     return 'service started.<br><br>To Stop Click <a href="./stop">here</a><br><br>To start fetching messages,' \

@@ -26,14 +26,6 @@ except ModuleNotFoundError:
 cnt = 0
 
 
-def start():
-    try:
-        os.remove('./static/qr.png')
-    except:
-        pass
-    print("Started.")
-
-
 def get_quote_from_tag(tag):
     message_quote_sender, message_quote_text = ['' for _ in range(2)]
     if do_contains_quote(str(tag)):
@@ -65,14 +57,14 @@ def bytes_to_image(bytes, image_name=None):
 class WhatsApp:
     browser = None
 
-    def __init__(self, initialize_whatsapp=True, wait=100, screenshot=None, session=None):
+    def __init__(self, session):
         chrome_options = Options()
         if session:
             chrome_options.add_argument("--user-data-dir={}".format(session))
             chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--disable-dev-shm-usage')
+            # chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.add_argument(
                 "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36")
             chrome_options.binary_location = os.environ.get('GOOGLE_CHROME_BIN')
@@ -84,25 +76,18 @@ class WhatsApp:
                 print("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'),
                                                 chrome_options=chrome_options)
-        else:
-            self.browser = webdriver.Chrome()
-            print("Chrome Driver is initialized successfully.")
-        if initialize_whatsapp:
-            self.browser.get("https://web.whatsapp.com/")
-            soup = BeautifulSoup(self.browser.page_source, "html.parser")
-            print(soup)  # DEBUGGING
-            self.get_qr()
-            print("WhatsApp Web Client is opening...")
-            WebDriverWait(self.browser, wait).until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, '._3FRCZ')))
-            if screenshot is not None:
-                self.browser.save_screenshot(screenshot)
-            self.search_selector = ".cBxw- > div:nth-child(2)"
-            self.browser.maximize_window()
-            self.OCR = OCR()
-            self.Watson = Watson()
-            self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=False)
-            self.participants_list_path = os.path.join(os.getcwd(), 'participants_list.csv')
+        self.browser.get("https://web.whatsapp.com/")
+        soup = BeautifulSoup(self.browser.page_source, "html.parser")
+        print(soup)  # DEBUGGING
+        self.get_qr()
+        print("WhatsApp Web Client is opening...")
+        WebDriverWait(self.browser, 30).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, '._3FRCZ')))
+        self.browser.maximize_window()
+        self.OCR = OCR()
+        self.Watson = Watson()
+        self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=False)
+        self.participants_list_path = os.path.join(os.getcwd(), 'participants_list.csv')
 
     def get_qr(self):
         try:
@@ -254,7 +239,7 @@ class WhatsApp:
             return
 
     def enter_chat_screen(self, chat_name):
-        search = self.browser.find_element_by_css_selector(self.search_selector)
+        search = self.browser.find_element_by_css_selector(".cBxw- > div:nth-child(2)")
         search.send_keys(chat_name + Keys.ENTER)
         print(f"Entered into the chat: \"{chat_name}\".")
 
