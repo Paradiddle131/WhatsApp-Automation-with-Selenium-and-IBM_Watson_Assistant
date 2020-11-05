@@ -90,6 +90,8 @@ class WhatsApp:
             logging.info("Chrome Driver is initialized successfully.")
         if initialize_whatsapp:
             self.browser.get("https://web.whatsapp.com/")
+            soup = BeautifulSoup(self.browser.page_source, "html.parser")
+            print(soup) # DEBUGGING
             self.get_qr()
             logging.info("WhatsApp Web Client is opening...")
             # emoji.json is a json file which contains all the emojis
