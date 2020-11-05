@@ -5,6 +5,28 @@ from base64 import b64encode
 import requests
 
 
+def encode_image(image):
+    request = {
+        'image': {
+            'content': b64encode(image).decode()
+        },
+        'features': [{
+            'type': 'DOCUMENT_TEXT_DETECTION',
+            'maxResults': 1
+        }]
+    }
+    logging.debug(f"Image encoded before OCR.")
+    return json.dumps({"requests": request}).encode()
+
+
+def correct_typo(text):
+    logging.debug(f"Text before typo correction -> {text}")
+    if '$' in text:
+        text = text.replace('$', 'S')
+    logging.debug(f"Text after typo correction -> {text}")
+    return text
+
+
 class OCR:
     def __init__(self):
         self.home_dir = os.getcwd()
@@ -12,23 +34,10 @@ class OCR:
             self.api_key = json.load(f)["api_key"]
         self.endpoint_url = 'https://vision.googleapis.com/v1/images:annotate'
 
-    def encode_image(self, image):
-        request = {
-            'image': {
-                'content': b64encode(image).decode()
-            },
-            'features': [{
-                'type': 'DOCUMENT_TEXT_DETECTION',
-                'maxResults': 1
-            }]
-        }
-        logging.debug(f"Image encoded before OCR.")
-        return json.dumps({"requests": request}).encode()
-
     def request_ocr(self, image):
         logging.debug(f"Request is preparing for OCR.")
         return requests.post(self.endpoint_url,
-                             data=self.encode_image(image),
+                             data=encode_image(image),
                              params={'key': self.api_key},
                              headers={'Content-Type': 'application/json'})
 
@@ -43,24 +52,9 @@ class OCR:
                 result = result.json()['responses'][0]['textAnnotations']
                 [extracted_text.append(result[i]['description']) for i in range(len(result))]
                 logging.info(f"Text is extracted from the image successfully.")
-                return self.correct_typo(' '.join(extracted_text[0].split("\n")))
+                return correct_typo(' '.join(extracted_text[0].split("\n")))
             except:
                 logging.warning(
                     f"\"textAnnotations\" couldn't retrieved from the result of Vision API. Result is -> {result}, "
                     f"Result.json() is -> {result.json()}")
                 return ''
-
-    def correct_typo(self, text):
-        logging.debug(f"Text before typo correction -> {text}")
-        if '$' in text:
-            text = text.replace('$', 'S')
-        logging.debug(f"Text after typo correction -> {text}")
-        return text
-
-
-if __name__ == '__main__':
-    ocr = OCR()
-    image_path = 'input/90cw.jpeg'
-    with open(image_path, 'rb') as f:
-        image = f.read()
-    print(ocr.image_to_text(image))
