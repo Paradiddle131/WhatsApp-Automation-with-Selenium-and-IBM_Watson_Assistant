@@ -4,7 +4,6 @@ import os
 import time
 from pprint import pprint
 
-import pygetwindow as gw
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from selenium import webdriver
@@ -16,6 +15,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from splunk_helper import *
+try:
+    import pygetwindow as gw
+except NotImplementedError:
+    isLinux = True
 
 
 def get_error_code(response):
@@ -51,11 +54,14 @@ class Splunk:
             try:
                 self.browser = webdriver.Chrome(options=chrome_options)
             except:
-                # if previous session is left open, close it
-                gw.getWindowsWithTitle('Search | Splunk 7.1.0')[0].close()
-                logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
-                gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
-                logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
+                if isLinux:
+                    os.system("TASKKILL /F /IM chrome.exe")
+                else:
+                    # if previous session is left open, close it
+                    gw.getWindowsWithTitle('Search | Splunk 7.1.0')[0].close()
+                    logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
+                    gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
+                    logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)
         if initialize_splunk:
             self.browser = webdriver.Chrome()

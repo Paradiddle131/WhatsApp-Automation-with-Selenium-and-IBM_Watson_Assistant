@@ -40,6 +40,7 @@ time_format = '%I:%M %p'
 path_home = os.getcwd()
 cnt = 0
 
+
 class WhatsApp:
     emoji = {}  # This dict will contain all emojies needed for chatting
     browser = None
