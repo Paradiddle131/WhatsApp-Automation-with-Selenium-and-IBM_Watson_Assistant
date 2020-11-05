@@ -39,8 +39,6 @@ non_bmp_map = dict.fromkeys(range(0x10000, sys.maxunicode + 1), 0xfffd)
 time_format = '%I:%M %p'
 path_home = os.getcwd()
 cnt = 0
-GOOGLE_CHROME_PATH = '/app/.apt/usr/bin/google_chrome'
-CHROMEDRIVER_PATH = '/app/.chromedriver/bin/chromedriver'
 
 class WhatsApp:
     emoji = {}  # This dict will contain all emojies needed for chatting
@@ -54,9 +52,9 @@ class WhatsApp:
             chrome_options.add_argument("--user-data-dir={}".format(session))
             chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--no-sandbox')
-            chrome_options.binary_location = GOOGLE_CHROME_PATH
+            chrome_options.binary_location = os.environ.get('GOOGLE_CHROME_PATH')
             try:
-                self.browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, chrome_options=chrome_options)
+                self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'), chrome_options=chrome_options)
             except:
                 if isLinux:
                     os.system("TASKKILL /F /IM chrome.exe")
@@ -66,7 +64,7 @@ class WhatsApp:
                     logging.info("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
                     gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
                     logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
-                self.browser = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, chrome_options=chrome_options)
+                self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'), chrome_options=chrome_options)
         else:
             self.browser = webdriver.Chrome()
             logging.info("Chrome Driver is initialized successfully.")
