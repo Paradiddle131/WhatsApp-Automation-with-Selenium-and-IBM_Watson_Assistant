@@ -40,6 +40,26 @@ time_format = '%I:%M %p'
 path_home = os.getcwd()
 cnt = 0
 
+
+def start():
+  try:
+    os.remove('./static/qr.png')
+  except:
+    pass
+  print("Started.")
+
+
+def setup():
+    logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='whatsapp.log')],
+                        level=logging.DEBUG,
+                        format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
+    wa = WhatsApp(session="mysession")
+    name = 'Genesis Bot Sandbox'
+    wa.enter_chat_screen(name)
+    # wa.check_new_message(name, run_forever=run_forever)
+    # wa.quit()
+
+
 class WhatsApp:
     emoji = {}  # This dict will contain all emojies needed for chatting
     browser = None
@@ -70,6 +90,7 @@ class WhatsApp:
             logging.info("Chrome Driver is initialized successfully.")
         if initialize_whatsapp:
             self.browser.get("https://web.whatsapp.com/")
+            self.get_qr()
             logging.info("WhatsApp Web Client is opening...")
             # emoji.json is a json file which contains all the emojis
             with open("emoji.json") as emojies:
@@ -85,6 +106,30 @@ class WhatsApp:
             self.Watson = Watson()
             self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=False)
             self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
+
+    def get_qr(self):
+        time.sleep(3)
+        try:
+            element = self.browser.find_element_by_xpath('//canvas[@aria-label = "Scan me!"]')
+        except:
+            print("No QR Code.")
+            return
+
+        location = element.location
+        size = element.size
+        self.browser.save_screenshot("shot.png")
+
+        x = location['x']
+        y = location['y']
+        w = size['width']
+        h = size['height']
+        width = x + w
+        height = y + h
+
+        im = Image.open('shot.png')
+        im = im.crop((int(x), int(y), int(width), int(height)))
+        im.save('static/qr.png')
+        os.remove("shot.png")
 
     def get_driver(self):
         return self.browser
@@ -371,63 +416,61 @@ class WhatsApp:
                 logging.debug(f"Quote Sender: \"{message_quote_sender}\"")
         return message_quote_sender, message_quote_text
 
+    def fetch_messages_continuously(self, last_tag=None):
+        global cnt
+        time.sleep(4)
+        message_text, message_sender, message_datetime, message_time, message_info = ['' for _ in range(5)]
+        dict_messages = {}
+        try:
+            soup = BeautifulSoup(self.browser.page_source, "html.parser")
+            tag = soup.find_all("div", class_="message-out")[-1]
+            message_id = tag.attrs["data-id"]
+            message_sender = self.get_sender_from_messageId(message_id)
+            if message_sender is None:
+                return
+            tag_text = tag.find_all("div", class_="copyable-text")
+            if tag != last_tag:
+                logging.debug(f"New message received at: {time.time()}")
+                if tag_text:
+                    tag_text = tag_text[-1]
+                    message_info = tag_text.attrs["data-pre-plain-text"]
+                    message_datetime = str_to_datetime(find_date(message_info) + ' ' + find_time(message_info))
+                    message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n", ' ')
+                else:
+                    message_datetime = self.get_time_from_tag(tag)
+                logging.debug(f"Message: \"{message_text}\"")
+                message_quote_sender, message_quote_text = self.get_quote_from_tag(tag)
+                message_text = self.get_ocr_from_tag(tag, message_text)
+                watson_response = self.Watson.message_stateless(message_text, doPrint=True)
+                dict_messages.update(
+                    {"_id": message_id,
+                     'sender': message_sender,
+                     'message': message_text,
+                     'datetime': message_datetime,
+                     'quote': {'sender': message_quote_sender,
+                               'message': message_quote_text},
+                     'watson_response': watson_response
+                     })
+                logging.debug("Final Message Dictionary ->", dict_messages)
+                # pprint(dict_messages)
+                try:
+                    self.Mongo.insert(dict_messages)
+                    return tag
+                except:
+                    logging.warning(f"Tried to insert into mongo but error occured.", exc_info=True)
+            else:
+                print("Sleeping for 3 seconds...")
+                time.sleep(3)
+                logging.info("Slept for 3 seconds since there is no new message.")
+        except:
+            logging.error(f"Some problem has occured.", exc_info=True)
+            print("Something wrong happened during the loop.")
+            return
+
     def check_new_message(self, name, run_forever=True):
         global cnt
         self.enter_chat_screen(name)
         time.sleep(4)
-        message_text, message_sender, message_datetime, message_time, message_info = ['' for _ in range(5)]
-        last_tag = None
-        dict_messages = {}
-        while True:
-            try:
-                soup = BeautifulSoup(self.browser.page_source, "html.parser")
-                tag = soup.find_all("div", class_="message-out")[-1]
-                message_id = tag.attrs["data-id"]
-                message_sender = self.get_sender_from_messageId(message_id)
-                if message_sender is None:
-                    continue
-                tag_text = tag.find_all("div", class_="copyable-text")
-                if tag != last_tag:
-                    logging.debug(f"New message received at: {time.time()}")
-                    last_tag = tag
-                    if tag_text:
-                        tag_text = tag_text[-1]
-                        message_info = tag_text.attrs["data-pre-plain-text"]
-                        message_datetime = str_to_datetime(find_date(message_info) + ' ' + find_time(message_info))
-                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n", ' ')
-                    else:
-                        message_datetime = self.get_time_from_tag(tag)
-                    logging.debug(f"Message: \"{message_text}\"")
-                    message_quote_sender, message_quote_text = self.get_quote_from_tag(tag)
-                    message_text = self.get_ocr_from_tag(tag, message_text)
-                    watson_response = self.Watson.message_stateless(message_text, doPrint=True)
-                    dict_messages.update(
-                        {"_id": message_id,
-                         'sender': message_sender,
-                         'message': message_text,
-                         'datetime': message_datetime,
-                         'quote': {'sender': message_quote_sender,
-                                   'message': message_quote_text},
-                         'watson_response': watson_response
-                         })
-                    logging.debug("Final Message Dictionary ->", dict_messages)
-                    # pprint(dict_messages)
-                    try:
-                        self.Mongo.insert(dict_messages)
-                    except:
-                        logging.warning(f"Tried to insert into mongo but error occured.", exc_info=True)
-                    if not run_forever:
-                        logging.info("breaking due to lac of passed argument: run_forever")
-                        print("breaking due to lac of passed argument: run_forever")
-                        break
-                else:
-                    print("Sleeping for 3 seconds...")
-                    time.sleep(3)
-                    logging.info("Slept for 3 seconds since there is no new message.")
-            except:
-                logging.error(f"Some problem has occured.", exc_info=True)
-                print("Something wrong happened during the loop.")
-                break
 
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(self.search_selector)
