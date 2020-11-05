@@ -1,4 +1,4 @@
-import os
+from os import getenv
 from ibm_watson import AssistantV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
@@ -30,14 +30,14 @@ class Watson:
     session_id = ''
 
     def __init__(self):
-        self.ASSISTANT_APIKEY = os.getenv('ASSISTANT_APIKEY')
-        self.ASSISTANT_IAM_APIKEY = os.getenv('ASSISTANT_IAM_APIKEY')
-        self.ASSISTANT_URL = os.getenv('ASSISTANT_URL')
-        self.ASSISTANT_AUTH_TYPE = os.getenv('ASSISTANT_AUTH_TYPE')
+        self.ASSISTANT_APIKEY = getenv('ASSISTANT_APIKEY')
+        self.ASSISTANT_IAM_APIKEY = getenv('ASSISTANT_IAM_APIKEY')
+        self.ASSISTANT_URL = getenv('ASSISTANT_URL')
+        self.ASSISTANT_AUTH_TYPE = getenv('ASSISTANT_AUTH_TYPE')
 
-        self.ASSISTANT_NAME = os.getenv('ASSISTANT_NAME')
-        self.ASSISTANT_ID = os.getenv('ASSISTANT_ID')
-        self.ASSISTANT_VERSION = os.getenv('ASSISTANT_VERSION')
+        self.ASSISTANT_NAME = getenv('ASSISTANT_NAME')
+        self.ASSISTANT_ID = getenv('ASSISTANT_ID')
+        self.ASSISTANT_VERSION = getenv('ASSISTANT_VERSION')
 
         self.authenticator = IAMAuthenticator(self.ASSISTANT_IAM_APIKEY)
         self.ASSISTANT = self.create_assistant()

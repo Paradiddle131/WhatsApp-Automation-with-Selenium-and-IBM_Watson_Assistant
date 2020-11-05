@@ -1,6 +1,6 @@
-import base64
-import time
-import os
+from base64 import b64decode
+from time import strptime, time, sleep
+from os import environ, path, getcwd, remove, system
 from io import BytesIO
 from pandas import read_csv
 from PIL import Image
@@ -38,7 +38,7 @@ def get_quote_from_tag(tag):
 
 
 def get_time_from_tag(tag):
-    return time.strptime(find_time(tag.text), '%I:%M %p')
+    return strptime(find_time(tag.text), '%I:%M %p')
 
 
 def bytes_to_image(bytes, image_name=None):
@@ -67,14 +67,14 @@ class WhatsApp:
             # chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.add_argument(
                 "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36")
-            chrome_options.binary_location = os.environ.get('GOOGLE_CHROME_BIN')
+            chrome_options.binary_location = environ.get('GOOGLE_CHROME_BIN')
             try:
-                self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'),
+                self.browser = webdriver.Chrome(executable_path=environ.get('CHROMEDRIVER_PATH'),
                                                 chrome_options=chrome_options)
             except:
-                os.system("TASKKILL /F /IM chrome.exe")
+                system("TASKKILL /F /IM chrome.exe")
                 print("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
-                self.browser = webdriver.Chrome(executable_path=os.environ.get('CHROMEDRIVER_PATH'),
+                self.browser = webdriver.Chrome(executable_path=environ.get('CHROMEDRIVER_PATH'),
                                                 chrome_options=chrome_options)
         self.browser.get("https://web.whatsapp.com/")
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
@@ -87,7 +87,7 @@ class WhatsApp:
         self.OCR = OCR()
         self.Watson = Watson()
         self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=False)
-        self.participants_list_path = os.path.join(os.getcwd(), 'participants_list.csv')
+        self.participants_list_path = path.join(getcwd(), 'participants_list.csv')
 
     def get_qr(self):
         try:
@@ -111,7 +111,7 @@ class WhatsApp:
         im = Image.open('shot.png')
         im = im.crop((int(x), int(y), int(width), int(height)))
         im.save('static/qr.png')
-        os.remove("shot.png")
+        remove("shot.png")
 
     def find_wait(self, element_xpath, by='xpath'):
         return WebDriverWait(self.browser, 10).until(EC.presence_of_element_located(
@@ -137,9 +137,9 @@ class WhatsApp:
         if not element:
             element = self.browser.find_element_by_xpath('//*[@id="main"]/div[3]/div/div/div[3]')
         for i in range(scroll_times):
-            time.sleep(0.2)
+            sleep(0.2)
             element.send_keys(Keys.ARROW_UP)
-        time.sleep(3)
+        sleep(3)
         print(f"Scrolled up for {scroll_times} times.")
 
     # extracts blob content as bytes
@@ -158,7 +158,7 @@ class WhatsApp:
         if type(result) == int:
             print(f"Couldn't get element from blob content on Chrome. Uri is: {uri}")
             raise Exception("Request failed with status %s" % result)
-        return base64.b64decode(result)
+        return b64decode(result)
 
     def is_trouble_shooter(self, GSM):
         try:
@@ -192,7 +192,7 @@ class WhatsApp:
 
     def fetch_messages_continuously(self, last_tag=None):
         global cnt
-        time.sleep(4)
+        sleep(4)
         message_text, message_sender, message_datetime, message_time, message_info = ['' for _ in range(5)]
         dict_messages = {}
         try:
@@ -204,7 +204,7 @@ class WhatsApp:
                 return
             tag_text = tag.find_all("div", class_="copyable-text")
             if tag != last_tag:
-                print(f"New message received at: {time.time()}")
+                print(f"New message received at: {time()}")
                 if tag_text:
                     tag_text = tag_text[-1]
                     message_info = tag_text.attrs["data-pre-plain-text"]
@@ -233,7 +233,7 @@ class WhatsApp:
                     print(f"Tried to insert into mongo but error occurred.")
             else:
                 print("Sleeping for 3 seconds...")
-                time.sleep(3)
+                sleep(3)
         except:
             print("Something wrong happened during the loop.")
             return

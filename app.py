@@ -1,13 +1,12 @@
 from flask import Flask, render_template
-from os import remove
-import time
-import random
-import whatsapp
+from time import sleep
+from random import randint
+from whatsapp import WhatsApp
 
 app = Flask(__name__)
 
 
-WhatsApp = whatsapp.WhatsApp(session="mysession")
+WhatsApp = WhatsApp(session="mysession")
 
 
 @app.route('/forever/', methods=['GET'])
@@ -16,7 +15,7 @@ def forever():
     while True:
         try:
             last_tag = WhatsApp.fetch_messages_continuously(last_tag)
-            time.sleep(3)
+            sleep(3)
             print(f"Sleeping for 3 seconds in app.py...")
         except:
             print(f"Problem occured during the forever loop in app.py.")
@@ -38,7 +37,7 @@ def stp():
 
 @app.route('/')
 def index():
-    return render_template('index.html', rval=random.randint(11111, 22222))
+    return render_template('index.html', rval=randint(11111, 22222))
 
 
 if __name__ == '__main__':
