@@ -8,7 +8,6 @@ from io import BytesIO
 from pprint import pprint
 
 import pandas as pd
-import pygetwindow as gw
 from PIL import Image
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
@@ -24,6 +23,10 @@ from OCR import *
 from mongodb import MongoDB
 from whatsapp_helper import *
 
+try:
+    import pygetwindow as gw
+except NotImplementedError:
+    isLinux = True
 try:
     from bs4 import BeautifulSoup
 except ModuleNotFoundError:
@@ -50,11 +53,14 @@ class WhatsApp:
             try:
                 self.browser = webdriver.Chrome(options=chrome_options)  # we are using chrome as our webbrowser
             except:
-                # if previous session is left open, close it
-                gw.getWindowsWithTitle('WhatsApp - Google Chrome')[0].close()
-                logging.info("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
-                gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
-                logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
+                if isLinux:
+                    os.system("TASKKILL /F /IM chrome.exe")
+                else:
+                    # if previous session is left open, close it
+                    gw.getWindowsWithTitle('WhatsApp - Google Chrome')[0].close()
+                    logging.info("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
+                    gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
+                    logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)  # we are using chrome as our webbrowser
         else:
             self.browser = webdriver.Chrome()
