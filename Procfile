@@ -1,0 +1,1 @@
+worker: python whatsapp.py --run_forever
