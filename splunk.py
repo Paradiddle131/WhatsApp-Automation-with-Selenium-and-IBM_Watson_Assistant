@@ -52,8 +52,8 @@ class Splunk:
                 self.browser = webdriver.Chrome(options=chrome_options)
             except:
                 # if previous session is left open, close it
-                gw.getWindowsWithTitle('Search | Splunk 7.1.0')[0].close()
-                logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
+                gw.getWindowsWithTitle('Search | Splunk 7.1.0 - Google Chrome')[0].close()
+                logging.info("Session is already open. \"Search | Splunk 7.1.0 - Google Chrome\" is closing...")
                 gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
                 logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)
@@ -76,7 +76,10 @@ class Splunk:
             (By.XPATH if by.lower() == 'xpath' else By.CLASS_NAME, element_xpath)))
 
     def search(self, keyword):
-        self.find_wait('app-icon-wrapper', by='class_name').click()
+        try:
+            self.find_wait('app-icon-wrapper', by='class_name', timeout=3).click()
+        except:
+            self.find_wait('label---pages-enterprise---7-1-0---1Xo01', by='class_name').click()
         self.find_wait('ace_editor.ace-spl-light', by='class_name').click()
         self.find_wait('icon-chevron-right', by='class_name').click()
         self.find_wait('search-query.text-clear ', by='class_name').send_keys(keyword)
@@ -84,9 +87,9 @@ class Splunk:
         self.find_wait('search-button', by='class_name').click()
         WebDriverWait(self.browser, 50).until(EC.presence_of_element_located(
             (By.CLASS_NAME, "contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas")))
+        time.sleep(2)
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         dict_events = {}
-        time.sleep(10)
         tags = soup.find_all("tr", attrs={"class": "shared-eventsviewer-list-body-row"})
         for cnt, tag in enumerate(tags):
             dict_event = {}
@@ -110,20 +113,6 @@ class Splunk:
             dict_events.update({cnt: dict_event})
             logging.debug("Scraped event ->", dict_event)
         return dict_events
-
-    def compare_merchantIds(self, response_watson):
-        error_code, merchantId = ['' for _ in range(2)]
-        for entity in response_watson['output']['entities']:
-            if entity['entity'] == "HATA_KODLARI":
-                error_code = entity['value']
-            elif entity['entity'] == "BayiKodu":
-                merchantId = entity['text']
-        response_splunk = self.search(error_code)
-        [logging.debug(f"MerchantId {merchantId} matches with splunk log.")
-         if merchantId == get_merchantId(response_splunk[i])
-         else logging.debug(f"MerchantId {merchantId} does not match with any splunk log.")
-         for i in response_splunk]
-        logging.info(f"Error code: {error_code}\nMerchantId: {merchantId}")
 
 
 if __name__ == '__main__':
