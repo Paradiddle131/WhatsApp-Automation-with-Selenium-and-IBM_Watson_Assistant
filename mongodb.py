@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import FileHandler, basicConfig, debug, DEBUG
 from os import path, getcwd, getenv
 from time import sleep
@@ -63,7 +63,7 @@ class MongoDB:
 
     def listen(self):
         cursor = self.collection.find(cursor_type=CursorType.TAILABLE)
-        splunk_event_dict, splunk_dict = [{} for _ in range(2)]
+        splunk_event_dict, splunk_dict, last_fetched = [{} for _ in range(3)]
         while cursor.alive:
             try:
                 doc = cursor.next()
@@ -73,8 +73,13 @@ class MongoDB:
                 error_code = response_watson['errorCode'] if 'errorCode' in response_watson.keys() else ''
                 debug(f"Error Code -> {error_code}")
                 debug(f"Merchant Id -> {merchant_id}")
-                if error_code not in splunk_dict.keys():
+                if error_code not in splunk_dict.keys() \
+                        or (error_code in last_fetched and
+                            datetime.now() > last_fetched[error_code] + timedelta(minutes=5)):
                     splunk_event_dict = self.Splunk.search(keyword=error_code)
+                    last_fetched.update({error_code: datetime.now()})
+                else:
+                    splunk_event_dict = splunk_dict[error_code]
                 [print("-->" + merchant_id + " matched!") if merchant_id == event['Request']['MerchantId='] and
                                                              do_dates_match(doc['datetime'], event['Date'])
                  else '' for event in splunk_event_dict.values()]
@@ -92,4 +97,3 @@ if __name__ == '__main__':
                     collection_name=getenv("collection_name"),
                     initialize_splunk=True)
     mongo.listen()
-    # TODO: Implement listen method for splunk that fetches new logs

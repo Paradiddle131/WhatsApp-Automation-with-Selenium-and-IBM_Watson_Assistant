@@ -108,5 +108,5 @@ class Splunk:
                 else:
                     dict_event.update({key: value})
             dict_events.update({cnt: dict_event})
-            debug("Scraped event ->", dict_event)
+            debug(f"Scraped event -> {dict_event}")
         return dict_events
