@@ -35,19 +35,6 @@ class Watson():
     def auth(self):
         self.ASSISTANT.set_service_url(self.ASSISTANT_URL)
 
-    def create_session(self):
-        response = self.ASSISTANT.create_session(
-            assistant_id=self.ASSISTANT_ID
-        ).get_result()
-        # print(json.dumps(response, indent=2))
-        self.session_id = response['session-id']
-
-    def delete_session(self):
-        return self.ASSISTANT.delete_session(
-            assistant_id=self.ASSISTANT_ID,
-            session_id=self.session_id
-        ).get_result()
-
     def message_stateless(self, text, doPrint=False):
         response = self.ASSISTANT.message_stateless(
             assistant_id=self.ASSISTANT_ID,
@@ -80,12 +67,6 @@ class Watson():
         assistant_reply = ''
         intents = response['output']['intents']
         entities = response['output']['entities']
-        try:
-            assistant_reply = response['output']['generic'][0]['text']
-            print(f"------------------------\nResponse of the text \"{text}\" is below:")
-        except:
-            logging.warning(f"Couldn't retrieve any text response from IBM Watson Assistant.")
-            pass  # No text response
         if len(intents) != 0:
             bot_reply.append("Captured Intent: " + intents[0]['intent'] + "\n")
         if len(entities) != 0:
