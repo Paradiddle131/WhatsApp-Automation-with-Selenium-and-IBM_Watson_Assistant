@@ -1,11 +1,11 @@
-import os
-import time
 from datetime import datetime
+from logging import FileHandler, basicConfig, debug, DEBUG
+from os import path, getcwd, getenv
+from time import sleep
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.cursor import CursorType
-from pymongo.errors import CollectionInvalid
 from pymongo.errors import DuplicateKeyError
 
 from splunk import Splunk
@@ -33,24 +33,25 @@ def get_watson_response_values(response_watson):
                 watson_values.update({"merchantId": merchantId})
     except Exception as e:
         print("Error ->", e)
+    debug(f"Watson values: {watson_values} captured from watson response: {response_watson}")
     return watson_values
 
 
 class MongoDB:
     def __init__(self, db_name, collection_name, initialize_splunk=True):
-        load_dotenv(os.path.join(os.getcwd(), 'mongodb-credentials.env'))
-        self.user = os.getenv('user')
-        self.password = os.getenv('password')
-        self.dbname = os.getenv('dbname')
+        load_dotenv(path.join(getcwd(), 'mongodb-credentials.env'))
+        self.user = getenv('user')
+        self.password = getenv('password')
+        self.dbname = getenv('dbname')
 
         self.cluster = MongoClient(
             f"mongodb+srv://botAdmin:{self.password}@whatsappcluster.p1ato.mongodb.net/{self.dbname}?retryWrites=true&w=majority")
         self.db = self.cluster[db_name]
-        try:
-            self.db.create_collection(collection_name, capped=True, size=100000, max=100)
+        if collection_name in self.db.list_collection_names():
             self.collection = self.db[collection_name]
-        except CollectionInvalid as e:
-            print("CollectionInvalid ->", e)
+        else:
+            print(f"No collection found as {collection_name}, creating.")
+            self.db.create_collection(collection_name, capped=True, size=100000, max=1)
             self.collection = self.db[collection_name]
         self.Splunk = Splunk(initialize_splunk=initialize_splunk)
 
@@ -62,15 +63,16 @@ class MongoDB:
 
     def listen(self):
         cursor = self.collection.find(cursor_type=CursorType.TAILABLE)
-        splunk_event_dict = {}
-        splunk_dict = {}
-        error_code = ''
+        splunk_event_dict, splunk_dict = [{} for _ in range(2)]
         while cursor.alive:
             try:
                 doc = cursor.next()
                 print(doc['message'])
                 response_watson = get_watson_response_values(doc['watson_response'])
                 merchant_id = response_watson['merchantId'] if 'merchantId' in response_watson.keys() else ''
+                error_code = response_watson['errorCode'] if 'errorCode' in response_watson.keys() else ''
+                debug(f"Error Code -> {error_code}")
+                debug(f"Merchant Id -> {merchant_id}")
                 if error_code not in splunk_dict.keys():
                     splunk_event_dict = self.Splunk.search(keyword=error_code)
                 [print("-->" + merchant_id + " matched!") if merchant_id == event['Request']['MerchantId='] and
@@ -78,13 +80,16 @@ class MongoDB:
                  else '' for event in splunk_event_dict.values()]
                 splunk_dict.update({error_code: splunk_event_dict})
             except StopIteration:
-                time.sleep(5)
+                sleep(5)
 
 
 if __name__ == '__main__':
-    load_dotenv(os.path.join(os.getcwd(), 'db.env'))
-    mongo = MongoDB(db_name=os.getenv("db_name"),
-                    collection_name=os.getenv("collection_name"),
+    basicConfig(handlers=[FileHandler(encoding='utf-8', filename='mongodb.log')],
+                level=DEBUG,
+                format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
+    load_dotenv(path.join(getcwd(), 'db.env'))
+    mongo = MongoDB(db_name=getenv("db_name"),
+                    collection_name=getenv("collection_name"),
                     initialize_splunk=True)
     mongo.listen()
     # TODO: Implement listen method for splunk that fetches new logs

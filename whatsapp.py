@@ -4,7 +4,7 @@ from io import BytesIO
 from logging import FileHandler, basicConfig, debug, info, warning, error, DEBUG
 from os import path, getcwd, getenv
 from pprint import pprint
-from time import strptime, time, sleep
+from time import time, sleep
 
 from PIL import Image
 from bs4 import BeautifulSoup
@@ -29,6 +29,36 @@ path_home = getcwd()
 cnt = 0
 
 
+def get_time_from_tag(tag):
+    h, m = int(find_time(tag.text).split(':')[0]), int(find_time(tag.text).split(':')[1][:2])
+    return datetime.now().replace(hour=h, minute=m)
+
+
+def get_quote_from_tag(tag):
+    message_quote_sender, message_quote_text = ['' for _ in range(2)]
+    if do_contains_quote(str(tag)):
+        quote = tag.find("span", class_=find_quote(str(tag)))
+        if quote:
+            message_quote_text = quote.text.replace("\n", ' ')
+            message_quote_sender = quote.parent.previous_sibling.find('span').text
+            debug(f"Quote Sender: \"{message_quote_sender}\"")
+    return message_quote_sender, message_quote_text
+
+
+def bytes_to_image(bytes, image_name=None):
+    """Convert bytes into PIL Image"""
+    try:
+        stream = BytesIO(bytes)
+        image = Image.open(stream).convert("RGBA")
+        stream.close()
+        if image_name:
+            image.save(f'output/image_{image_name}.png')
+        return image
+    except:
+        error(f"Bytes couldn't converted into an image. Bytes: {bytes}", exc_info=True)
+        return None
+
+
 class WhatsApp:
     load_dotenv(path.join(getcwd(), 'db.env'))
     browser = None
@@ -42,10 +72,12 @@ class WhatsApp:
                 self.browser = webdriver.Chrome(options=chrome_options)
             except:
                 # if previous session is left open, close it
-                getWindowsWithTitle('WhatsApp - Google Chrome')[0].close()
-                info("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
-                getWindowsWithTitle('New Tab - Google Chrome')[0].close()
-                info("Session is already open. \"New Tab - Google Chrome\" is closing...")
+                if getWindowsWithTitle('WhatsApp - Google Chrome'):
+                    getWindowsWithTitle('WhatsApp - Google Chrome')[0].close()
+                    info("Session is already open. \"WhatsApp - Google Chrome\" is closing...")
+                if getWindowsWithTitle('New Tab - Google Chrome'):
+                    getWindowsWithTitle('New Tab - Google Chrome')[0].close()
+                    info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)
         else:
             self.browser = webdriver.Chrome()
@@ -115,19 +147,6 @@ class WhatsApp:
             raise Exception("Request failed with status %s" % result)
         return b64decode(result)
 
-    def bytes_to_image(self, bytes, image_name=None):
-        """Convert bytes into PIL Image"""
-        try:
-            stream = BytesIO(bytes)
-            image = Image.open(stream).convert("RGBA")
-            stream.close()
-            if image_name:
-                image.save(f'output/image_{image_name}.png')
-            return image
-        except:
-            error(f"Bytes couldn't converted into an image. Bytes: {bytes}", exc_info=True)
-            return None
-
     def is_trouble_shooter(self, GSM):
         """Classifies the sender as a trouble shooter or not"""
         try:
@@ -147,7 +166,7 @@ class WhatsApp:
             image_link = find_image(str(tag))
             image_bytes = self.get_file_content_chrome(image_link)
             if save:
-                self.bytes_to_image(image_bytes, cnt)  # Save the image on output folder
+                bytes_to_image(image_bytes, cnt)  # Save the image on output folder
             message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
             debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
         return message_text
@@ -160,19 +179,6 @@ class WhatsApp:
             return None
         debug(f"GSM No: {message_sender} is classified as \"crew member\".")
         return message_sender
-
-    def get_time_from_tag(self, tag):
-        return strptime(find_time(tag.text), '%I:%M %p')
-
-    def get_quote_from_tag(self, tag):
-        message_quote_sender, message_quote_text = ['' for _ in range(2)]
-        if do_contains_quote(str(tag)):
-            quote = tag.find("span", class_=find_quote(str(tag)))
-            if quote:
-                message_quote_text = quote.text.replace("\n", ' ')
-                message_quote_sender = quote.parent.previous_sibling.find('span').text
-                debug(f"Quote Sender: \"{message_quote_sender}\"")
-        return message_quote_sender, message_quote_text
 
     def check_new_message(self, name, run_forever=True):
         """Constantly checks for new messages and inserts them into MongoDB Collection"""
@@ -203,9 +209,9 @@ class WhatsApp:
                         message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n",
                                                                                                                  ' ')
                     else:
-                        message_datetime = self.get_time_from_tag(tag)
+                        message_datetime = get_time_from_tag(tag)
                     debug(f"Message: \"{message_text}\"")
-                    message_quote_sender, message_quote_text = self.get_quote_from_tag(tag)
+                    message_quote_sender, message_quote_text = get_quote_from_tag(tag)
                     message_text = self.get_ocr_from_tag(tag, message_text)
                     watson_response = self.Watson.message_stateless(message_text, doPrint=True)
                     dict_messages.update(
