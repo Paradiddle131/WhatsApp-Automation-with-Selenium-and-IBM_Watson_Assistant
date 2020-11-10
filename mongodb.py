@@ -82,6 +82,7 @@ class MongoDB:
 
 
 if __name__ == '__main__':
+    load_dotenv(os.path.join(os.getcwd(), 'db.env'))
     mongo = MongoDB(db_name=os.getenv("db_name"),
                     collection_name=os.getenv("collection_name"),
                     initialize_splunk=True)

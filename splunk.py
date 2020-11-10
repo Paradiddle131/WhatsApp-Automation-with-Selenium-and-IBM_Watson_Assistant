@@ -1,4 +1,4 @@
-from logging import FileHandler, basicConfig, debug, info, warning
+from logging import FileHandler, basicConfig, debug, info, warning, DEBUG
 from os import path, getcwd, getenv
 from time import sleep
 
@@ -40,7 +40,7 @@ class Splunk:
 
     def __init__(self, initialize_splunk=True, session=None):
         basicConfig(handlers=[FileHandler(encoding='utf-8', filename='splunk.log')],
-                            level=debug,
+                            level=DEBUG,
                             format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
         load_dotenv(path.join(getcwd(), 'splunk-credentials.env'))
         chrome_options = Options()
