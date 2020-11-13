@@ -2,11 +2,14 @@ import os
 from pymongo import MongoClient, CursorType
 from dotenv import load_dotenv
 import time
+
+from pymongo.errors import CollectionInvalid
+
 from splunk import Splunk
 
 
 class MongoDB:
-    def __init__(self, db_name='WhatsApp', collection_name='messages', initialize_splunk=True):
+    def __init__(self, db_name='WhatsApp', collection_name='messages_capped', initialize_splunk=True):
         load_dotenv(os.path.join(os.getcwd(), 'mongodb-credentials.env'))
         self.user = os.getenv('user')
         self.password = os.getenv('password')
@@ -15,7 +18,12 @@ class MongoDB:
         self.cluster = MongoClient(
             f"mongodb+srv://botAdmin:{self.password}@whatsappcluster.p1ato.mongodb.net/{self.dbname}?retryWrites=true&w=majority")
         self.db = self.cluster[db_name]
-        self.collection = self.db[collection_name]
+        try:
+            self.db.create_collection(collection_name, capped=True, size=100000, max=100)
+            self.collection = self.db[collection_name]
+        except CollectionInvalid as e:
+            print(e)
+            self.collection = self.db[collection_name]
 
         self.Splunk = Splunk(initialize_splunk=initialize_splunk)
 
@@ -38,7 +46,7 @@ class MongoDB:
 
 
 if __name__ == '__main__':
-    mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=True)
+    mongo = MongoDB(db_name='WhatsApp', collection_name='Messages', initialize_splunk=True)
 
     post1 = {"name": "lasagna"}
     post2 = {"_id": 5, "name": "joe"}

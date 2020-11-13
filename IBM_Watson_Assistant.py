@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 from ibm_watson import AssistantV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-
+from ibm_cloud_sdk_core.api_exception import ApiException
 
 class Watson():
     session_id = ''
@@ -39,14 +39,48 @@ class Watson():
         response = self.ASSISTANT.create_session(
             assistant_id=self.ASSISTANT_ID
         ).get_result()
-        # print(json.dumps(response, indent=2))
-        self.session_id = response['session-id']
+        self.session_id = response['session_id']
+        logging.debug(f"IBM Assistant session is created with response ->", response)
+        return self.session_id
 
     def delete_session(self):
         return self.ASSISTANT.delete_session(
             assistant_id=self.ASSISTANT_ID,
             session_id=self.session_id
         ).get_result()
+
+    def message_stateful(self, text, session_id, doPrint=False):
+        try:
+            response = self.ASSISTANT.message(
+                assistant_id=self.ASSISTANT_ID,
+                session_id=session_id,
+                input={
+                    'message_type': 'text',
+                    'text': text
+                }
+            ).get_result()
+        except ApiException:
+            logging.warning(f"Session has timed out due to inactivity.", exc_info=True)
+            self.session_id = self.create_session()
+            logging.info(f"New session has been initiated.")
+            return "{'output': {'intents': [], 'entities': [], 'generic': [{'response_type': 'text', 'text': 'Oturum zaman aşımına uğradı. \"Merhaba\" yazarak tekrar başlatabilirsiniz.'}]}}"
+        logging.debug(f"Response from IBM Watson -> {response}")
+        try:
+            if (len(response['output']['intents']) == 0 and
+                len(response['output']['entities']) == 0 and
+                len(response['output']['generic']) == 0) or \
+                    response['output']['generic'][0]['response_type'] == 'suggestion' or \
+                    'Çözüldü' in [entity['entity'] for entity in response['output']['entities']]:
+                logging.info(f"Nothing captured from text {text}.")
+                return ''
+        except:
+            pass
+        if doPrint:
+            self.print_reply_with_intent(response, text)
+        entities = response['output']['entities']
+        [response['output']['entities'][i].update(
+            {'text': text[entity['location'][0]-1: entity['location'][1]-1]}) for i, entity in enumerate(entities)]
+        return response
 
     def message_stateless(self, text, doPrint=False):
         response = self.ASSISTANT.message_stateless(
@@ -91,7 +125,7 @@ class Watson():
         if len(entities) != 0:
             for entity in entities:
                 logging.debug(f"Entity found on location: {entity['location']}")
-                bot_reply.append("Captured Entity: " + entity['entity'] + " -> " + text[entity['location'][0]-1:entity['location'][1]] + "\n")
+                bot_reply.append("Captured Entity: " + entity['entity'] + " -> " + text[entity['location'][0]:entity['location'][1]] + "\n")
         bot_reply.append("Reply: " + assistant_reply) if assistant_reply is not '' else None
         logging.debug(f"Bot reply is -> {bot_reply}")
         print(''.join(bot_reply))

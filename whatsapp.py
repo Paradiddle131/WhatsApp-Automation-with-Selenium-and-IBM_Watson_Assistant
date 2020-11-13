@@ -6,6 +6,7 @@ import time
 import argparse
 from io import BytesIO
 from pprint import pprint
+import requests
 
 import pandas as pd
 import pygetwindow as gw
@@ -74,7 +75,7 @@ class WhatsApp:
             self.browser.maximize_window()
             self.OCR = OCR()
             self.Watson = Watson()
-            self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages', initialize_splunk=False)
+            self.Mongo = MongoDB(db_name='WhatsApp', collection_name='messages_capped_', initialize_splunk=False)
             self.participants_list_path = os.path.join(path_home, 'participants_list.csv')
 
     def get_driver(self):
@@ -91,7 +92,6 @@ class WhatsApp:
             (By.XPATH if by.lower() == 'xpath' else By.CSS_SELECTOR, element_xpath)))
 
     def send_message(self, name, message):
-        message = self.emojify(message)  # this will emojify all the emoji which is present as the text in string
         self.enter_chat_screen(name)
         try:
             send_msg = WebDriverWait(self.browser, self.timeout).until(EC.presence_of_element_located(
@@ -100,7 +100,6 @@ class WhatsApp:
             for msg in messages:
                 send_msg.send_keys(msg)
                 send_msg.send_keys(Keys.SHIFT + Keys.ENTER)
-                logging.info(f"Message \"{msg}\" is sent to \"{name}\"")
             send_msg.send_keys(Keys.ENTER)
             return True
         except TimeoutException:
@@ -402,19 +401,57 @@ class WhatsApp:
                          'watson_response': watson_response
                          })
                     logging.debug("Final Message Dictionary ->", dict_messages)
-                    # pprint(dict_messages)
+                    pprint(dict_messages)
                     try:
-                        self.Mongo.insert(dict_messages)
+                        requests.post("https://covidbot-test.herokuapp.com/bot", data=message_text)
+                        # self.Mongo.insert(dict_messages)
                     except:
-                        logging.warning(f"Tried to insert into mongo but error occured.", exc_info=True)
+                        logging.warning(f"Tried to insert into mongo but error occurred.", exc_info=True)
                     if not run_forever:
-                        logging.info("breaking due to lac of passed argument: run_forever")
-                        print("breaking due to lac of passed argument: run_forever")
+                        logging.info("breaking due to lack of passed argument: run_forever")
+                        print("breaking due to lack of passed argument: run_forever")
                         break
                 else:
-                    print("Sleeping for 3 seconds...")
-                    time.sleep(3)
-                    logging.info("Slept for 3 seconds since there is no new message.")
+                    time.sleep(5)
+                    # logging.debug("Slept for 3 seconds since there is no new message.")
+            except:
+                logging.error(f"Some problem has occured.", exc_info=True)
+                print("Something wrong happened during the loop.")
+                break
+
+    def run_bot(self, name):
+        self.enter_chat_screen(name)
+        message_text = ''
+        last_tag = None
+        contacts = {}
+        while True:
+            try:
+                soup = BeautifulSoup(self.browser.page_source, "html.parser")
+                tag = soup.find_all("div", class_="message-out")[-1]
+                tag_text = tag.find_all("div", class_="copyable-text")
+                if tag != last_tag:
+                    logging.debug(f"New message received at: {time.time()}")
+                    last_tag = tag
+                    if tag_text:
+                        tag_text = tag_text[-1]
+                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n", ' ') \
+                            if tag_text.find("span", class_="selectable-text") is not None \
+                            else tag_text.find("img", class_="copyable-text").attrs['alt']
+                    message_text = self.get_ocr_from_tag(tag, message_text)
+                    try:
+                        if name not in contacts.keys():
+                            contacts.update({name: self.Watson.create_session()})
+                        watson_response = self.Watson.message_stateful(message_text, session_id=contacts[name], doPrint=True)['output']['generic'][0]['text']
+                        self.send_message(name=name, message=watson_response)
+                        # Following 3 lines will be discarded when it comes to check inbound messaging
+                        time.sleep(1)
+                        soup = BeautifulSoup(self.browser.page_source, "html.parser")
+                        tag = soup.find_all("div", class_="message-out")[-1]
+                        last_tag = tag
+                    except:
+                        print("No response from Watson.")
+                else:
+                    time.sleep(.1)
             except:
                 logging.error(f"Some problem has occured.", exc_info=True)
                 print("Something wrong happened during the loop.")
@@ -440,5 +477,5 @@ if __name__ == '__main__':
                         format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(session="mysession")
     name = 'Genesis Bot Sandbox'
-    wa.check_new_message(name, run_forever=args.run_forever)
+    wa.run_bot(name)
     wa.quit()
