@@ -1,12 +1,10 @@
-import json
-import logging.config
-import os
-import time
-from pprint import pprint
+from logging import FileHandler, basicConfig, debug, info, warning, DEBUG
+from os import path, getcwd, getenv
+from time import sleep
 
-import pygetwindow as gw
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from pygetwindow import getWindowsWithTitle
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
@@ -23,7 +21,7 @@ def get_error_code(response):
         error_code = response['Response']['Header']['ErrorCode']['dialect']
     except:
         error_code = response['Response']['ResponseCode=']
-    logging.info(f"Error code: {error_code} found")
+    info(f"Error code: {error_code} found")
     return error_code
 
 
@@ -32,8 +30,8 @@ def get_merchantId(response):
         merchantId = response['Request']['MerchantId=']
     except:
         merchantId = ''
-        logging.warning(f"Error finding merchantId", exc_info=True)
-    logging.debug(f"MerchantId: {merchantId} found on splunk logs.")
+        warning(f"Error finding merchantId", exc_info=True)
+    debug(f"MerchantId: {merchantId} found on splunk logs.")
     return merchantId
 
 
@@ -41,10 +39,10 @@ class Splunk:
     timeout = 10
 
     def __init__(self, initialize_splunk=True, session=None):
-        logging.basicConfig(handlers=[logging.FileHandler(encoding='utf-8', filename='splunk.log')],
-                            level=logging.DEBUG,
+        basicConfig(handlers=[FileHandler(encoding='utf-8', filename='splunk.log')],
+                            level=DEBUG,
                             format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
-        load_dotenv(os.path.join(os.getcwd(), 'splunk-credentials.env'))
+        load_dotenv(path.join(getcwd(), 'splunk-credentials.env'))
         chrome_options = Options()
         if session:
             chrome_options.add_argument("--user-data-dir={}".format(session))
@@ -52,23 +50,24 @@ class Splunk:
                 self.browser = webdriver.Chrome(options=chrome_options)
             except:
                 # if previous session is left open, close it
-                gw.getWindowsWithTitle('Search | Splunk 7.1.0')[0].close()
-                logging.info("Session is already open. \"Home | Splunk 7.1.0\" is closing...")
-                gw.getWindowsWithTitle('New Tab - Google Chrome')[0].close()
-                logging.info("Session is already open. \"New Tab - Google Chrome\" is closing...")
+                getWindowsWithTitle('Search | Splunk 7.1.0 - Google Chrome')[0].close()
+                info("Session is already open. \"Search | Splunk 7.1.0 - Google Chrome\" is closing...")
+                getWindowsWithTitle('New Tab - Google Chrome')[0].close()
+                info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)
         if initialize_splunk:
             self.browser = webdriver.Chrome()
-            self.browser.get(os.getenv('URL'))
+            self.browser.get(getenv('URL'))
             self.browser.maximize_window()
             self.sign_in()
 
     def sign_in(self):
         try:
-            self.browser.find_element_by_xpath('//*[@id="username"]').send_keys(os.getenv('name'))
-            self.browser.find_element_by_xpath('//*[@id="password"]').send_keys(os.getenv('password_splunk') + Keys.ENTER)
+            self.browser.find_element_by_xpath('//*[@id="username"]').send_keys(getenv('name'))
+            self.browser.find_element_by_xpath('//*[@id="password"]').send_keys(
+                getenv('password_splunk') + Keys.ENTER)
         except NoSuchElementException:
-            logging.info("Sign in screen is not loaded.", exc_info=False)
+            info("Sign in screen is not loaded.", exc_info=False)
             pass
 
     def find_wait(self, element_xpath, timeout=timeout, by='xpath'):
@@ -76,7 +75,10 @@ class Splunk:
             (By.XPATH if by.lower() == 'xpath' else By.CLASS_NAME, element_xpath)))
 
     def search(self, keyword):
-        self.find_wait('app-icon-wrapper', by='class_name').click()
+        try:
+            self.find_wait('app-icon-wrapper', by='class_name', timeout=3).click()
+        except:
+            self.find_wait('label---pages-enterprise---7-1-0---1Xo01', by='class_name').click()
         self.find_wait('ace_editor.ace-spl-light', by='class_name').click()
         self.find_wait('icon-chevron-right', by='class_name').click()
         self.find_wait('search-query.text-clear ', by='class_name').send_keys(keyword)
@@ -84,19 +86,17 @@ class Splunk:
         self.find_wait('search-button', by='class_name').click()
         WebDriverWait(self.browser, 50).until(EC.presence_of_element_located(
             (By.CLASS_NAME, "contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas")))
+        sleep(2)
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         dict_events = {}
-        time.sleep(10)
         tags = soup.find_all("tr", attrs={"class": "shared-eventsviewer-list-body-row"})
         for cnt, tag in enumerate(tags):
             dict_event = {}
             items = tag.find("div", class_="json-tree shared-jsontree") \
                 .contents[5].find_all("span", class_="key level-1")
-            if '{' == tag.find("span", attrs={"data-path": "RequestMessage"}).text[0]:  # JSON format (Outgoing)
+            if '{' == tag.find("span", attrs={"data-path": "RequestMessage"}).text[0]:  # Outgoing
                 continue
-                # request = json.loads(tag.find("span", attrs={"data-path": "RequestMessage"}).text)
-                # response = json.loads(tag.find("span", attrs={"data-path": "ResponseMessage"}).text)
-            else:  # Tag format (Incoming)
+            else:  # Incoming
                 request = find_attribute_from_tag(tag.find("span", attrs={"data-path": "RequestMessage"}).text)
                 response = find_attribute_from_tag(tag.find("span", attrs={"data-path": "ResponseMessage"}).text)
             for item in items:
@@ -108,24 +108,5 @@ class Splunk:
                 else:
                     dict_event.update({key: value})
             dict_events.update({cnt: dict_event})
-            logging.debug("Scraped event ->", dict_event)
+            debug(f"Scraped event -> {dict_event}")
         return dict_events
-
-    def compare_merchantIds(self, response_watson):
-        error_code, merchantId = ['' for _ in range(2)]
-        for entity in response_watson['output']['entities']:
-            if entity['entity'] == "HATA_KODLARI":
-                error_code = entity['value']
-            elif entity['entity'] == "BayiKodu":
-                merchantId = entity['text']
-        response_splunk = self.search(error_code)
-        [logging.debug(f"MerchantId {merchantId} matches with splunk log.")
-         if merchantId == get_merchantId(response_splunk[i])
-         else logging.debug(f"MerchantId {merchantId} does not match with any splunk log.")
-         for i in response_splunk]
-        logging.info(f"Error code: {error_code}\nMerchantId: {merchantId}")
-
-
-if __name__ == '__main__':
-    splunk = Splunk(session="splunk-session")
-    pprint(splunk.search(os.getenv("query1")))
