@@ -1,20 +1,23 @@
-import time
-from whatsapp import WhatsApp
+from flask import Flask, request
+from splunk import Splunk
+from json import dumps
 
-if __name__ == '__main__':
-    wa = WhatsApp(100, session="mysession")
+app = Flask(__name__)
 
-    name = 'Genesis Best Grup'
 
-    # print("\n\n\n @@@ #of PARTICIPANTS: ", wa.participants_count_for_group(name), "\n\n\n")
+@app.route("/")
+def hello():
+    return "Welcome to Splunk validation page!"
 
-    # list_participants = wa.get_group_participants(name)
-    # print(f"\n\n\n @@@ {len(list_participants)} PARTICIPANTS: ", list_participants, "\n\n\n")
 
-    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_messages_by_attribute(name), "\n\n\n")
-    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_messages_by_class(name), "\n\n\n")
-    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.repeatfun(name), "\n\n\n")
-    # print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_last_messages(name), "\n\n\n")
-    print(f"\n\n\n @@@ MESSAGES OF GROUP '{name}':\n ", wa.get_last_messages(name), "\n\n\n")
-    # time.sleep(7)
-    wa.quit()
+splunk = Splunk()
+
+
+@app.route("/search", methods=['POST'])
+def search():
+    print("Query on /search ->", request.get_json()['query'])
+    return dumps({"status": "OK"}) if splunk.search(request.get_json()['query']) else dumps({"status": "Fail"})
+
+
+if __name__ == "__main__":
+    app.run(host="localhost", port=5002, debug=False)
