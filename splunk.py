@@ -1,7 +1,7 @@
 from logging import FileHandler, basicConfig, debug, info, warning, DEBUG
 from os import path, getcwd, getenv
 from time import sleep
-
+from pyautogui import click, typewrite
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from pygetwindow import getWindowsWithTitle
@@ -74,15 +74,14 @@ class Splunk:
         return WebDriverWait(self.browser, timeout=timeout).until(EC.presence_of_element_located(
             (By.XPATH if by.lower() == 'xpath' else By.CLASS_NAME, element_xpath)))
 
-    def search(self, keyword):
+    def search(self, query):
         try:
             self.find_wait('app-icon-wrapper', by='class_name', timeout=3).click()
         except:
             self.find_wait('label---pages-enterprise---7-1-0---1Xo01', by='class_name').click()
-        self.find_wait('ace_editor.ace-spl-light', by='class_name').click()
-        self.find_wait('icon-chevron-right', by='class_name').click()
-        self.find_wait('search-query.text-clear ', by='class_name').send_keys(keyword)
-        self.find_wait('search-link', 70, by='class_name').click()
+        x_search_bar, y_search_bar = list(self.find_wait('ace_editor.ace-spl-light', by='class_name').location.values())
+        click(x_search_bar, y_search_bar)
+        typewrite(query)
         self.find_wait('search-button', by='class_name').click()
         WebDriverWait(self.browser, 50).until(EC.presence_of_element_located(
             (By.CLASS_NAME, "contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas")))
