@@ -13,8 +13,6 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from splunk_helper import *
-
 
 def get_error_code(response):
     try:
@@ -40,8 +38,8 @@ class Splunk:
 
     def __init__(self, initialize_splunk=True, session=None):
         basicConfig(handlers=[FileHandler(encoding='utf-8', filename='splunk.log')],
-                            level=DEBUG,
-                            format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
+                    level=DEBUG,
+                    format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
         load_dotenv(path.join(getcwd(), 'splunk-credentials.env'))
         chrome_options = Options()
         if session:
@@ -76,7 +74,7 @@ class Splunk:
 
     def search(self, query):
         try:
-            self.find_wait('app-icon-wrapper', by='class_name', timeout=3).click()
+            self.browser.find_element_by_class_name('app-icon-wrapper').click()
         except:
             self.find_wait('label---pages-enterprise---7-1-0---1Xo01', by='class_name').click()
         x_search_bar, y_search_bar = list(self.find_wait('ace_editor.ace-spl-light', by='class_name').location.values())
@@ -85,27 +83,10 @@ class Splunk:
         self.find_wait('search-button', by='class_name').click()
         WebDriverWait(self.browser, 50).until(EC.presence_of_element_located(
             (By.CLASS_NAME, "contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas")))
-        sleep(2)
+        sleep(0.2)
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
-        dict_events = {}
         tags = soup.find_all("tr", attrs={"class": "shared-eventsviewer-list-body-row"})
         for cnt, tag in enumerate(tags):
-            dict_event = {}
             items = tag.find("div", class_="json-tree shared-jsontree") \
-                .contents[5].find_all("span", class_="key level-1")
-            if '{' == tag.find("span", attrs={"data-path": "RequestMessage"}).text[0]:  # Outgoing
-                continue
-            else:  # Incoming
-                request = find_attribute_from_tag(tag.find("span", attrs={"data-path": "RequestMessage"}).text)
-                response = find_attribute_from_tag(tag.find("span", attrs={"data-path": "ResponseMessage"}).text)
-            for item in items:
-                key, value = item.contents[1].text, item.contents[3].text
-                if key == 'RequestMessage':
-                    dict_event.update(request)
-                elif key == 'ResponseMessage':
-                    dict_event.update(response)
-                else:
-                    dict_event.update({key: value})
-            dict_events.update({cnt: dict_event})
-            debug(f"Scraped event -> {dict_event}")
-        return dict_events
+                .contents[5].find("span", class_="key level-1")
+            return True if len(items) != 0 else False
