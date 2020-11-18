@@ -81,9 +81,8 @@ class Splunk:
         click(x_search_bar, y_search_bar)
         typewrite(query)
         self.find_wait('search-button', by='class_name').click()
-        WebDriverWait(self.browser, 50).until(EC.presence_of_element_located(
-            (By.CLASS_NAME, "contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas")))
-        sleep(0.2)
+        self.find_wait("contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas", 3, by='class_name')
+        sleep(0.5)
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         tags = soup.find_all("tr", attrs={"class": "shared-eventsviewer-list-body-row"})
         for cnt, tag in enumerate(tags):
