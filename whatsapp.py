@@ -213,7 +213,7 @@ class WhatsApp:
                     debug(f"Message: \"{message_text}\"")
                     message_quote_sender, message_quote_text = get_quote_from_tag(tag)
                     message_text = self.get_ocr_from_tag(tag, message_text)
-                    watson_response = self.Watson.message_stateless(message_text, doPrint=True)
+                    watson_response = self.Watson.message(message_text, do_print=True)
                     dict_messages.update(
                         {"_id": message_id,
                          'sender': message_sender,
@@ -253,14 +253,17 @@ class WhatsApp:
                     last_tag = tag
                     if tag_text:
                         tag_text = tag_text[-1]
-                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n", ' ') \
+                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n",
+                                                                                                                 ' ') \
                             if tag_text.find("span", class_="selectable-text") is not None \
                             else tag_text.find("img", class_="copyable-text").attrs['alt']
                     message_text = self.get_ocr_from_tag(tag, message_text)
                     try:
                         if name not in contacts.keys():
                             contacts.update({name: self.Watson.create_session()})
-                        watson_response = self.Watson.message_stateful(message_text, session_id=contacts[name], doPrint=True)['output']['generic'][0]['text']
+                        watson_response = \
+                        self.Watson.message(message_text, session_id=contacts[name], do_print=True)['output']['generic'][
+                            0]['text']
                         self.send_message(name=name, message=watson_response)
                         # Following 3 lines will be discarded when it comes to check inbound messaging
                         sleep(1)
@@ -275,7 +278,6 @@ class WhatsApp:
                 error(f"Some problem has occurred.", exc_info=True)
                 print("Something wrong happened during the loop.")
                 break
-
 
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(".cBxw- > div:nth-child(2)")
@@ -293,8 +295,8 @@ if __name__ == '__main__':
                         help='running forever or not')
     args = parser.parse_args()
     basicConfig(handlers=[FileHandler(encoding='utf-8', filename='whatsapp.log')],
-                        level=DEBUG,
-                        format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
+                level=DEBUG,
+                format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(session="mysession")
     name = 'Genesis Bot Sandbox'
     wa.run_bot(name)
