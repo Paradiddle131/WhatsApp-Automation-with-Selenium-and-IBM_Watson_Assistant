@@ -59,6 +59,13 @@ def bytes_to_image(bytes, image_name=None):
         return None
 
 
+def change_datetime_format(message_text):
+    try:
+        return datetime.strptime(find_date(message_text), "%d/%m/%Y").strftime("%m/%d/%Y")
+    except ValueError:
+        debug("Given date is already in mm/dd/yyyy format.", exc_info=True)
+
+
 class WhatsApp:
     load_dotenv(path.join(getcwd(), 'db.env'))
     browser = None
@@ -85,8 +92,7 @@ class WhatsApp:
         if initialize_whatsapp:
             self.browser.get("https://web.whatsapp.com/")
             info("WhatsApp Web Client is opening...")
-            WebDriverWait(self.browser, 30).until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, '._3FRCZ')))
+            self.find_wait("copyable-text.selectable-text", By.CLASS_NAME)
             self.browser.maximize_window()
             self.OCR = OCR()
             self.Watson = Watson()
@@ -94,15 +100,14 @@ class WhatsApp:
                                  initialize_splunk=False)
             self.participants_list_path = path.join(path_home, 'participants_list.csv')
 
-    def find_wait(self, element_xpath, by='xpath'):
-        return WebDriverWait(self.browser, self.timeout).until(EC.presence_of_element_located(
-            (By.XPATH if by.lower() == 'xpath' else By.CSS_SELECTOR, element_xpath)))
+    def find_wait(self, element_xpath, by=By.XPATH):
+        return WebDriverWait(self.browser, self.timeout).until(
+            EC.presence_of_element_located((by, element_xpath)))
 
     def send_message(self, name, message):
         self.enter_chat_screen(name)
         try:
-            send_msg = WebDriverWait(self.browser, self.timeout).until(EC.presence_of_element_located(
-                (By.XPATH, "/html/body/div/div/div/div[4]/div/footer/div[1]/div[2]/div/div[2]")))
+            send_msg = self.find_wait("/html/body/div/div/div/div[4]/div/footer/div[1]/div[2]/div/div[2]", By.XPATH)
             messages = message.split("\n")
             for msg in messages:
                 send_msg.send_keys(msg)
@@ -249,21 +254,20 @@ class WhatsApp:
                 tag = soup.find_all("div", class_="message-out")[-1]
                 tag_text = tag.find_all("div", class_="copyable-text")
                 if tag != last_tag:
-                    debug(f"New message received at: {time()}")
+                    debug(f"New message received.")
                     last_tag = tag
                     if tag_text:
                         tag_text = tag_text[-1]
-                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n",
-                                                                                                                 ' ') \
+                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n",' ') \
                             if tag_text.find("span", class_="selectable-text") is not None \
                             else tag_text.find("img", class_="copyable-text").attrs['alt']
                     message_text = self.get_ocr_from_tag(tag, message_text)
+                    message_text = change_datetime_format(message_text)
                     try:
                         if name not in contacts.keys():
                             contacts.update({name: self.Watson.create_session()})
                         watson_response = \
-                        self.Watson.message(message_text, session_id=contacts[name], do_print=True)['output']['generic'][
-                            0]['text']
+                        self.Watson.message(message_text, session_id=contacts[name], do_print=True)['output']['generic'][0]['text']
                         self.send_message(name=name, message=watson_response)
                         # Following 3 lines will be discarded when it comes to check inbound messaging
                         sleep(1)
@@ -282,6 +286,7 @@ class WhatsApp:
     def enter_chat_screen(self, chat_name):
         search = self.browser.find_element_by_css_selector(".cBxw- > div:nth-child(2)")
         search.send_keys(chat_name + Keys.ENTER)
+        self.find_wait("copyable-area", By.CLASS_NAME)
         info(f"Entered into the chat: \"{name}\".")
 
     def quit(self):
