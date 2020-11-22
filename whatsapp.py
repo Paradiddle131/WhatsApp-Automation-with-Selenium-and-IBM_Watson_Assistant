@@ -60,8 +60,9 @@ def bytes_to_image(bytes, image_name=None):
 
 
 def change_datetime_format(message_text):
+    date = find_date(message_text)
     try:
-        return datetime.strptime(find_date(message_text), "%d/%m/%Y").strftime("%m/%d/%Y")
+        return message_text.replace(date, datetime.strptime(date, "%d/%m/%Y").strftime("%m/%d/%Y"))
     except ValueError:
         debug("Given date is already in mm/dd/yyyy format.", exc_info=True)
 
@@ -92,7 +93,7 @@ class WhatsApp:
         if initialize_whatsapp:
             self.browser.get("https://web.whatsapp.com/")
             info("WhatsApp Web Client is opening...")
-            self.find_wait("copyable-text.selectable-text", By.CLASS_NAME)
+            self.find_wait("copyable-text.selectable-text", By.CLASS_NAME, timeout=30)
             self.browser.maximize_window()
             self.OCR = OCR()
             self.Watson = Watson()
@@ -100,12 +101,13 @@ class WhatsApp:
                                  initialize_splunk=False)
             self.participants_list_path = path.join(path_home, 'participants_list.csv')
 
-    def find_wait(self, element_xpath, by=By.XPATH):
-        return WebDriverWait(self.browser, self.timeout).until(
+    def find_wait(self, element_xpath, by=By.XPATH, timeout=10):
+        return WebDriverWait(self.browser, timeout).until(
             EC.presence_of_element_located((by, element_xpath)))
 
     def send_message(self, name, message):
-        self.enter_chat_screen(name)
+        if not self.in_chat_screen:
+            self.enter_chat_screen(name)
         try:
             send_msg = self.find_wait("/html/body/div/div/div/div[4]/div/footer/div[1]/div[2]/div/div[2]", By.XPATH)
             messages = message.split("\n")
@@ -174,6 +176,8 @@ class WhatsApp:
                 bytes_to_image(image_bytes, cnt)  # Save the image on output folder
             message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
             debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
+        else:
+            warning(f"No image found either.", exc_info=True)
         return message_text
 
     def get_sender_from_messageId(self, messageId):
@@ -262,7 +266,9 @@ class WhatsApp:
                             if tag_text.find("span", class_="selectable-text") is not None \
                             else tag_text.find("img", class_="copyable-text").attrs['alt']
                     message_text = self.get_ocr_from_tag(tag, message_text)
-                    message_text = change_datetime_format(message_text)
+                    info(f"message_text: {message_text}")
+                    if do_contains_date(message_text):
+                        message_text = change_datetime_format(message_text)
                     try:
                         if name not in contacts.keys():
                             contacts.update({name: self.Watson.create_session()})
@@ -270,7 +276,7 @@ class WhatsApp:
                         self.Watson.message(message_text, session_id=contacts[name], do_print=True)['output']['generic'][0]['text']
                         self.send_message(name=name, message=watson_response)
                         # Following 3 lines will be discarded when it comes to check inbound messaging
-                        sleep(1)
+                        sleep(2)
                         soup = BeautifulSoup(self.browser.page_source, "html.parser")
                         tag = soup.find_all("div", class_="message-out")[-1]
                         last_tag = tag
@@ -287,7 +293,11 @@ class WhatsApp:
         search = self.browser.find_element_by_css_selector(".cBxw- > div:nth-child(2)")
         search.send_keys(chat_name + Keys.ENTER)
         self.find_wait("copyable-area", By.CLASS_NAME)
+        sleep(.5)
         info(f"Entered into the chat: \"{name}\".")
+
+    def in_chat_screen(self):
+        return True if self.find_wait("copyable-area", By.CLASS_NAME) is not None else False
 
     def quit(self):
         info("Exiting Whatsapp Web...")
@@ -299,7 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('-rf', '--run_forever', dest='run_forever', action='store_true',
                         help='running forever or not')
     args = parser.parse_args()
-    basicConfig(handlers=[FileHandler(encoding='utf-8', filename='whatsapp.log')],
+    basicConfig(handlers=[FileHandler(encoding='utf-8', filename='whatsapp.log', mode='w')],
                 level=DEBUG,
                 format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
     wa = WhatsApp(session="mysession")
