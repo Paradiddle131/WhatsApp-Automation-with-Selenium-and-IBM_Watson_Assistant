@@ -53,6 +53,10 @@ def find_date(text):
      return [x.group() for x in re.finditer(r'\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b', text)][0]
 
 
+def do_contains_date(text):
+    return re.compile(r'\b\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b').search(text)
+
+
 def str_to_datetime(date_string):
     """Ex: '02/11/2020 2:25 pm'"""
     return datetime.strptime(date_string, '%d/%m/%Y %I:%M %p')
