@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from base64 import b64decode
 from io import BytesIO
+from json import loads
 from logging import FileHandler, basicConfig, debug, info, warning, error, DEBUG
 from os import path, getcwd, getenv
 from pprint import pprint
@@ -11,6 +12,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from pandas import read_csv
 from pygetwindow import getWindowsWithTitle
+from requests import post
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
@@ -272,8 +274,13 @@ class WhatsApp:
                     try:
                         if name not in contacts.keys():
                             contacts.update({name: self.Watson.create_session()})
-                        watson_response = \
-                        self.Watson.message(message_text, session_id=contacts[name], do_print=True)['output']['generic'][0]['text']
+                        watson_response = self.Watson.message(message_text, session_id=contacts[name], do_print=True)\
+                            ['output']['generic'][0]['text']
+                        if "||" in watson_response:
+                            webhook_response = post(url="http://7130ad6b3e52.ngrok.io/search", json=loads(watson_response.split('||')[-1]))
+                            debug("webhook_response -> " + str(webhook_response.__dict__['_content'].decode('utf-8')))
+                            watson_response = " ".join(watson_response.split('||')[:-1]) if webhook_response else "webhook returned false"
+                            debug("watson_response -> " + watson_response)
                         self.send_message(name=name, message=watson_response)
                         # Following 3 lines will be discarded when it comes to check inbound messaging
                         sleep(2)
@@ -290,7 +297,7 @@ class WhatsApp:
                 break
 
     def enter_chat_screen(self, chat_name):
-        search = self.browser.find_element_by_css_selector(".cBxw- > div:nth-child(2)")
+        search = self.find_wait("copyable-text.selectable-text", by=By.CLASS_NAME, timeout=50)
         search.send_keys(chat_name + Keys.ENTER)
         self.find_wait("copyable-area", By.CLASS_NAME)
         sleep(.5)
