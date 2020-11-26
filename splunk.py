@@ -87,15 +87,15 @@ class Splunk:
         typewrite(query)
         self.find_wait('search-button', by='class_name').click()
         self.find_wait("contrib-jg_lib-display-Element.contrib-jg_lib-graphics-Canvas", 3, by='class_name')
-        sleep(0.5)
+        sleep(1.5)
         soup = BeautifulSoup(self.browser.page_source, "html.parser")
         tags = soup.find_all("tr", attrs={"class": "shared-eventsviewer-list-body-row"})
         for cnt, tag in enumerate(tags):
             items = tag.find("div", class_="json-tree shared-jsontree") \
                 .contents[5].find_all("span", class_="key level-1")
             for item in items:
-                if item.contents[1].text == "RequestMessage" or item.contents[1].text == "ResponseMessage":
-                    if action == Action.OKC:
+                if action == Action.OKC:
+                    if item.contents[1].text == "RequestMessage" or item.contents[1].text == "ResponseMessage":
                         if query[0] == '9' and \
                             loads(items[5].contents[3].text).popitem()[1]['category'][2]['value'] == 'Accepted' and \
                             loads(items[6].contents[3].text).popitem()[1]['Status'] == 1:
@@ -117,6 +117,7 @@ class Splunk:
         elif is_sent_mccm and not is_reduced_balance:
             print('Check CCB Logs for "ws_log" and "subscriber_option" and contact to IT CIS')
         print("is_sent_mccm:", str(is_sent_mccm), "\nis_reduced_balance:", str(is_reduced_balance))
+        return True
 
     def quit(self):
         info("Exiting Splunk...")
