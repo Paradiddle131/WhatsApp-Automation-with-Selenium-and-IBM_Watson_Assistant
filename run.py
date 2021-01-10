@@ -19,7 +19,7 @@ class Nodes(enum.Enum):
     OKC = "OKC"
     WAIT = "WAIT"
     FATURA_ALAMADIM = "FATURA_ALAMADIM"
-
+    PAKET_YUKLENMEMIS ="PAKET_YUKLENMEMIS"
 
 @app.route("/search", methods=['POST'])
 def search():
@@ -42,7 +42,15 @@ def search():
     elif node == Nodes.OKC:
         if "GSMNo" in req_data.keys():
             success = True if splunk.check_okc(req_data["GSMNo"]) else False
-
+    elif node == Nodes.PAKET_YUKLENMEMIS:
+        response_message = splunk.check_package_not_loaded(req_data["GSMNo"])
+        print(response_message)
+        success = True if response_message else False
+        return app.response_class(
+            response=dumps({"response_message": response_message}),
+            status=200 if success else 404,
+            mimetype='application/json'
+        )
     return app.response_class(
         response=dumps({"success": success}),
         status=200 if success else 404,
