@@ -26,6 +26,7 @@ from IBM_Watson_Assistant import Watson
 from OCR import OCR
 from mongodb import MongoDB
 from whatsapp_helper import *
+from bot import Bot
 
 path_home = getcwd()
 cnt = 0
@@ -102,6 +103,7 @@ class WhatsApp:
             self.Mongo = MongoDB(db_name=getenv("db_name"), collection_name=getenv("collection_name"),
                                  initialize_splunk=False)
             self.participants_list_path = path.join(path_home, 'participants_list.csv')
+            self.bot = Bot()
 
     def find_wait(self, element_xpath, by=By.XPATH, timeout=10):
         return WebDriverWait(self.browser, timeout).until(
@@ -274,14 +276,9 @@ class WhatsApp:
                     try:
                         if name not in contacts.keys():
                             contacts.update({name: self.Watson.create_session()})
-                        watson_response = self.Watson.message(message_text, session_id=contacts[name], do_print=True)\
-                            ['output']['generic'][0]['text']
-                        if "||" in watson_response:
-                            webhook_response = post(url="http://7130ad6b3e52.ngrok.io/search", json=loads(watson_response.split('||')[-1]))
-                            debug("webhook_response -> " + str(webhook_response.__dict__['_content'].decode('utf-8')))
-                            watson_response = " ".join(watson_response.split('||')[:-1]) if webhook_response else "webhook returned false"
-                            debug("watson_response -> " + watson_response)
-                        self.send_message(name=name, message=watson_response)
+                        response_http = self.bot.get_response(message_text)
+                        debug("HTTP Response of bot -> " + response_http)
+                        self.send_message(name=name, message=response_http)
                         # Following 3 lines will be discarded when it comes to check inbound messaging
                         sleep(2)
                         soup = BeautifulSoup(self.browser.page_source, "html.parser")

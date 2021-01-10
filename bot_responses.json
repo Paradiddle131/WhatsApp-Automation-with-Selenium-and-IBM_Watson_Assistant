@@ -1,0 +1,7 @@
+{
+  "greet": "Merhaba, ben Whatsapp Genesis Bot!\nTalebiniz nedir? Lütfen talebin başındaki harfi mesaj olarak gönderiniz\n\n*A*. Fatura alamadım. (ekos_40/tibco_200) \n*B*. İşlemim tamamlanamadıda/açıkta kaldı. \n*C*. Müşteriye paket yüklenmemiş.\n*D*. Talep iptali istiyorum.\n*E*. MCCM yaptım iptale düştü.\n*F*. Uyumlu fırsat kodu çıkmadı.\n*G*. Müşteriye teklif görüntülenemiyor.\n*H*. Diğer.",
+  "A0": "Lütfen *hata kodu* ve *bayi kodu* içeren fişin fotoğrafını yükleyiniz. \n\n*Menu.* Ana menüye dönmek için",
+  "A1": "Lütfen fişteki bayi kodunu, hata kodunu ve işlem tarihini *gg/aa/yyyy* formatında yazınız.",
+  "B0": "Lütfen *hata kodu* ve *bayi kodu* içeren fişin fotoğrafını yükleyiniz.\n\n*Menu.* Ana menüye dönmek için",
+  "C0": "Lütfen cep telefonu numarasını yazınız."
+}
