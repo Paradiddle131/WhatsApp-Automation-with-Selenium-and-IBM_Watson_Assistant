@@ -23,6 +23,7 @@ class Nodes(enum.Enum):
 
 @app.route("/search", methods=['POST'])
 def search():
+    response_message = ""
     req_data = request.get_json()
     success = False
     node = Nodes(req_data["node"]) if "node" in req_data.keys() else None
@@ -30,6 +31,7 @@ def search():
     if node == Nodes.FATURA_ALAMADIM:
             query = f"""sourcetype = GateLogger | search "MerchantId="{req_data['merchant_id']}"" | search "ResponseCode="{req_data['error_code']}"" | where like(Date, "%{req_data['date']}%")"""
             success = True if splunk.search(query) else False
+            response_message = f"*\"{req_data['merchant_id']}\"* Bayi kodu ve *\"{req_data['error_code']}\"* hata kodu ile *\"FMXXXXXXXX\"* max kaydı oluşturuldu."
     elif node == Nodes.WAIT:
         print(req_data['wait'])
         if req_data['wait']:
@@ -41,18 +43,14 @@ def search():
         success = True
     elif node == Nodes.OKC:
         if "GSMNo" in req_data.keys():
-            success = True if splunk.check_okc(req_data["GSMNo"]) else False
+            response_message = splunk.search(req_data["GSMNo"])
+            success = True if response_message else False
     elif node == Nodes.PAKET_YUKLENMEMIS:
         response_message = splunk.check_package_not_loaded(req_data["GSMNo"])
         print(response_message)
         success = True if response_message else False
-        return app.response_class(
-            response=dumps({"response_message": response_message}),
-            status=200 if success else 404,
-            mimetype='application/json'
-        )
     return app.response_class(
-        response=dumps({"success": success}),
+        response=dumps({"response_message": response_message}),
         status=200 if success else 404,
         mimetype='application/json'
     )

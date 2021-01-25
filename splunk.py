@@ -123,6 +123,7 @@ class Splunk:
                         #Anything to do here?
                         pass
                 else:
+                    sleep(2)
                     items = tag.find("div", class_="json-tree shared-jsontree") \
                         .contents[5].find("span", class_="key level-1")
                     return True if len(items) != 0 else False
@@ -143,7 +144,7 @@ class Splunk:
             print('Check CCB Logs for "ws_log" and "subscriber_option" and contact to IT CIS')
             # check_ccb()
         print("is_sent_mccm:", str(is_sent_mccm), "\nis_reduced_balance:", str(is_reduced_balance))
-        return True
+        return "OKC kontrolleri yapılmış, ilgili ekiplere bildirilmiştir. Süreçten haberdar edileceksiniz."
 
     def check_package_not_loaded(self, gsm_no):
         try:
@@ -181,7 +182,8 @@ class Splunk:
             else:
                 print("Unexpected error occurred.")
                 return f"Beklenmedik bir hata oluştu. Lütfen bilgileri kontrol edip daha sonra tekrar deneyiniz."
-            return True
+            print(self.isKolayPackage, self.isBalanceReduced)
+            return f"İlgili ekip (IT CIS SSPM OPS) bilgilendirilmiştir. Son durumdan haberdar edileceksiniz. Beklediğiniz için teşekkürler."
         except:
             error("Error:", exc_info=True)
             return f"Beklenmedik bir hata oluştu. Lütfen bilgileri kontrol edip daha sonra tekrar deneyiniz."
@@ -192,9 +194,3 @@ class Splunk:
     def quit(self):
         info("Exiting Splunk...")
         self.browser.quit()
-
-
-if __name__ == '__main__':
-    splunk = Splunk()
-    # splunk.search(query="905537935687", action=Action.PAKET_YUKLENMEMIS)  # 90'li cikiyor
-    splunk.check_package_not_loaded("5363104196")
