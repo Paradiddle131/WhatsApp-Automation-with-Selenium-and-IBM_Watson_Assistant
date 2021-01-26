@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from base64 import b64decode
 from io import BytesIO
-from json import loads
+from json import load
 from logging import FileHandler, basicConfig, debug, info, warning, error, DEBUG
 from os import path, getcwd, getenv
 from pprint import pprint
@@ -11,25 +11,30 @@ from PIL import Image
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from pandas import read_csv
+from pyautogui import click
 from pygetwindow import getWindowsWithTitle
-from requests import post
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+import bot
 from IBM_Watson_Assistant import Watson
 from OCR import OCR
 from mongodb import MongoDB
 from whatsapp_helper import *
-from bot import Bot
+
+# TODO: Import Nodes on here instead of run.py
 
 path_home = getcwd()
 cnt = 0
+
+
+class BotActions:
+    WAIT_FOR_NODE_INPUT = "Wait for node input"
+    GREET = "Greet"
 
 
 def get_time_from_tag(tag):
@@ -103,14 +108,15 @@ class WhatsApp:
             self.Mongo = MongoDB(db_name=getenv("db_name"), collection_name=getenv("collection_name"),
                                  initialize_splunk=False)
             self.participants_list_path = path.join(path_home, 'participants_list.csv')
-            self.bot = Bot()
+            self.bot = bot.Bot()
 
     def find_wait(self, element_xpath, by=By.XPATH, timeout=10):
         return WebDriverWait(self.browser, timeout).until(
             EC.presence_of_element_located((by, element_xpath)))
 
     def send_message(self, name, message):
-        if not self.in_chat_screen:
+        print(f" MOCK SENDING MESSAGE {message} to {name}")
+        '''if not self.in_chat_screen:
             self.enter_chat_screen(name)
         try:
             send_msg = self.find_wait("/html/body/div/div/div/div[4]/div/footer/div[1]/div[2]/div/div[2]", By.XPATH)
@@ -129,7 +135,7 @@ class WhatsApp:
             return False
         except Exception:
             error("Exception occurred", exc_info=True)
-            return False
+            return False'''
 
     def scroll_up_panel(self, scroll_times=20, element=None):
         if not element:
@@ -168,21 +174,21 @@ class WhatsApp:
             error(f"Error occurred during the Pandas DataFrame actions.", exc_info=True)
             return None
 
-    def get_ocr_from_tag(self, tag, message_text, save=False):
-        """Extracts text from image using Google Vision API"""
-        global cnt
-        if do_contains_image(str(tag)) \
-                and not do_contains_audio(str(tag)) \
-                and not do_contains_quoted_image(str(tag)):
-            image_link = find_image(str(tag))
-            image_bytes = self.get_file_content_chrome(image_link)
-            if save:
-                bytes_to_image(image_bytes, cnt)  # Save the image on output folder
-            message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
-            debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
-        else:
-            warning(f"No image found either.", exc_info=True)
-        return message_text
+    # def get_ocr_from_tag(self, tag, message_text, save=False):
+    #     """Extracts text from image using Google Vision API"""
+    #     global cnt
+    #     if do_contains_image(str(tag)) \
+    #             and not do_contains_audio(str(tag)) \
+    #             and not do_contains_quoted_image(str(tag)):
+    #         image_link = find_image(str(tag))
+    #         image_bytes = self.get_file_content_chrome(image_link)
+    #         if save:
+    #             bytes_to_image(image_bytes, cnt)  # Save the image on output folder
+    #         message_text = message_text + " || " + self.OCR.image_to_text(image_bytes).replace("\n", ' ')
+    #         debug(f"Message from the text: \"{message_text.split('||')[1]}\"")
+    #     else:
+    #         warning(f"No image found either.", exc_info=True)
+    #     return message_text
 
     def get_sender_from_messageId(self, messageId):
         message_sender = find_phone_number(messageId)
@@ -225,7 +231,7 @@ class WhatsApp:
                         message_datetime = get_time_from_tag(tag)
                     debug(f"Message: \"{message_text}\"")
                     message_quote_sender, message_quote_text = get_quote_from_tag(tag)
-                    message_text = self.get_ocr_from_tag(tag, message_text)
+                    # message_text = self.get_ocr_from_tag(tag, message_text)
                     watson_response = self.Watson.message(message_text, do_print=True)
                     dict_messages.update(
                         {"_id": message_id,
@@ -251,47 +257,74 @@ class WhatsApp:
                 print("Something wrong happened during the loop.")
                 break
 
-    def run_bot(self, name):
-        self.enter_chat_screen(name)
-        message_text = ''
+    def run_bot(self):
+        name, message_text = ["" for _ in range(2)]
+        message_div_class = "message-in"
         last_tag = None
-        contacts = {}
+        # contacts = {}
+        dialog_tree = {}
         while True:
             try:
-                soup = BeautifulSoup(self.browser.page_source, "html.parser")
-                tag = soup.find_all("div", class_="message-out")[-1]
-                tag_text = tag.find_all("div", class_="copyable-text")
-                if tag != last_tag:
-                    debug(f"New message received.")
-                    last_tag = tag
-                    if tag_text:
-                        tag_text = tag_text[-1]
-                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n",' ') \
-                            if tag_text.find("span", class_="selectable-text") is not None \
-                            else tag_text.find("img", class_="copyable-text").attrs['alt']
-                    message_text = self.get_ocr_from_tag(tag, message_text)
-                    info(f"message_text: {message_text}")
-                    if do_contains_date(message_text):
-                        message_text = change_datetime_format(message_text)
-                    try:
-                        if name not in contacts.keys():
-                            contacts.update({name: self.Watson.create_session()})
-                        response_http = self.bot.get_response(message_text)
-                        debug("HTTP Response of bot -> " + response_http)
-                        self.send_message(name=name, message=response_http)
-                        # Following 3 lines will be discarded when it comes to check inbound messaging
-                        sleep(2)
-                        soup = BeautifulSoup(self.browser.page_source, "html.parser")
-                        tag = soup.find_all("div", class_="message-out")[-1]
+                with open("bot_dialog_tree.json") as f:
+                    dialog_tree = load(f)
+                new_sender = self.get_new_sender()
+                if self.get_new_sender() is not None:
+                    self.enter_chat_screen(new_sender)
+                    if new_sender not in dialog_tree.keys():
+                        dialog_tree.update({new_sender: {"action": BotActions.GREET}})
+                        name = new_sender
+                        self.enter_chat_screen(name)
+                if name != "":
+                    soup = BeautifulSoup(self.browser.page_source, "html.parser")
+                    tag = soup.find_all("div", class_=message_div_class)[-1]
+                    tag_text = tag.find_all("div", class_="copyable-text")
+                    if tag != last_tag:
+                        debug(f"New message received.")
                         last_tag = tag
-                    except:
-                        print("No response from Watson.")
+                        if tag_text:
+                            tag_text = tag_text[-1]
+                            message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace(
+                                "\n", ' ') \
+                                if tag_text.find("span", class_="selectable-text") is not None \
+                                else tag_text.find("img", class_="copyable-text").attrs['alt']
+                        # message_text = self.get_ocr_from_tag(tag, message_text)
+                        info(f"message_text: {message_text}")
+                        if do_contains_date(message_text):
+                            message_text = change_datetime_format(message_text)
+                        try:
+                            response_http = self.bot.get_response(message_text, dialog_tree[name])
+                            debug("HTTP Response of bot -> " + response_http)
+                            self.send_message(name=name, message=response_http)
+                            last_tag = tag
+                        except:
+                            print("No response from bot.")
+                    else:
+                        sleep(.1)
                 else:
-                    sleep(.1)
+                    sleep(.5)
             except:
                 error(f"Some problem has occurred.", exc_info=True)
                 print("Something wrong happened during the loop.")
                 break
+
+    def unread_messages(self):
+        soup = BeautifulSoup(self.browser.page_source, "html.parser")
+        tag = soup.find_all("span", attrs={"aria-label": re.compile(r"[0-9] unread message")})[-1]
+        self.browser.find_elements_by_xpath(f'//*[contains(@aria-label, "unread message")]')
+        tag_text = tag.find_all("div", class_="copyable-text")
+        # TODO
+
+    def check_new_sender(self):
+        return self.browser.find_elements_by_xpath(f'//*[contains(@aria-label, "unread message")]')
+
+    def get_new_sender(self):
+        soup = BeautifulSoup(self.browser.page_source, "html.parser")
+        try:
+            return soup.find("span", attrs={
+                "aria-label": re.compile(r"[0-9] unread message")}).parent.parent.parent.parent.parent.contents[
+                0].contents[0].text
+        except:
+            return None
 
     def enter_chat_screen(self, chat_name):
         search = self.find_wait("copyable-text.selectable-text", by=By.CLASS_NAME, timeout=50)
@@ -319,4 +352,5 @@ if __name__ == '__main__':
     wa = WhatsApp(session="mysession")
     name = 'Genesis Bot Sandbox'
     wa.run_bot(name)
+    # wa.unread_messages()
     wa.quit()
