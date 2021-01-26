@@ -49,9 +49,6 @@ class Splunk:
     isBalanceReduced, isKolayPackage = [False for _ in range(2)]
     date_splunk = None
     def __init__(self, initialize_splunk=True, session=None):
-        basicConfig(handlers=[FileHandler(encoding='utf-8', filename='splunk.log')],
-                    level=DEBUG,
-                    format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
         load_dotenv(path.join(getcwd(), 'splunk-credentials.env'))
         chrome_options = Options()
         if session:
@@ -60,17 +57,20 @@ class Splunk:
                 self.browser = webdriver.Chrome(options=chrome_options)
             except:
                 # if previous session is left open, close it
-                getWindowsWithTitle('Search | Splunk 7.1.0 - Google Chrome')[0].close()
-                info("Session is already open. \"Search | Splunk 7.1.0 - Google Chrome\" is closing...")
-                getWindowsWithTitle('New Tab - Google Chrome')[0].close()
-                info("Session is already open. \"New Tab - Google Chrome\" is closing...")
+                if getWindowsWithTitle('Search | Splunk 7.1.0 - Google Chrome'):
+                    getWindowsWithTitle('Search | Splunk 7.1.0 - Google Chrome')[0].close()
+                    info("Session is already open. \"Search | Splunk 7.1.0 - Google Chrome\" is closing...")
+                if getWindowsWithTitle('New Tab - Google Chrome'):
+                    getWindowsWithTitle('New Tab - Google Chrome')[0].close()
+                    info("Session is already open. \"New Tab - Google Chrome\" is closing...")
                 self.browser = webdriver.Chrome(options=chrome_options)
         if initialize_splunk:
             self.browser = webdriver.Chrome()
             self.browser.get(getenv('URL'))
             self.browser.maximize_window()
             self.sign_in()
-        self.ccb = CCB()
+        if not hasattr(self, "ccb"):
+            self.ccb = CCB()
 
     def sign_in(self):
         try:

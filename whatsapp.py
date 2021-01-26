@@ -1,17 +1,13 @@
-from argparse import ArgumentParser
 from base64 import b64decode
 from io import BytesIO
 from json import load
-from logging import FileHandler, basicConfig, debug, info, warning, error, DEBUG
-from os import path, getcwd, getenv
-from pprint import pprint
-from time import time, sleep
+from logging import debug, info, error
+from os import path, getcwd
+from time import sleep
 
 from PIL import Image
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 from pandas import read_csv
-from pyautogui import click
 from pygetwindow import getWindowsWithTitle
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -20,10 +16,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-import bot
 from IBM_Watson_Assistant import Watson
 from OCR import OCR
-from mongodb import MongoDB
 from whatsapp_helper import *
 
 # TODO: Import Nodes on here instead of run.py
@@ -76,7 +70,6 @@ def change_datetime_format(message_text):
 
 
 class WhatsApp:
-    load_dotenv(path.join(getcwd(), 'db.env'))
     browser = None
     timeout = 10
 
@@ -105,10 +98,9 @@ class WhatsApp:
             self.browser.maximize_window()
             self.OCR = OCR()
             self.Watson = Watson()
-            self.Mongo = MongoDB(db_name=getenv("db_name"), collection_name=getenv("collection_name"),
-                                 initialize_splunk=False)
             self.participants_list_path = path.join(path_home, 'participants_list.csv')
-            self.bot = bot.Bot()
+            from bot import Bot
+            self.bot = Bot()
 
     def find_wait(self, element_xpath, by=By.XPATH, timeout=10):
         return WebDriverWait(self.browser, timeout).until(
@@ -199,69 +191,11 @@ class WhatsApp:
         debug(f"GSM No: {message_sender} is classified as \"crew member\".")
         return message_sender
 
-    def check_new_message(self, name, run_forever=True):
-        """Constantly checks for new messages and inserts them into MongoDB Collection"""
-        global cnt
-        self.enter_chat_screen(name)
-        sleep(4)
-        message_text, message_sender, message_datetime, message_time, message_info = ['' for _ in range(5)]
-        last_tag = None
-        dict_messages = {}
-        while True:
-            try:
-                soup = BeautifulSoup(self.browser.page_source, "html.parser")
-                tag = soup.find_all("div", class_="message-out")[-1]
-                if tag == last_tag:
-                    sleep(5)
-                else:
-                    last_tag = tag
-                    debug(f"New message received at: {time()}")
-                    message_id = tag.attrs["data-id"]
-                    message_sender = self.get_sender_from_messageId(message_id)
-                    if message_sender is None:
-                        continue
-                    tag_text = tag.find_all("div", class_="copyable-text")
-                    if tag_text:
-                        tag_text = tag_text[-1]
-                        message_info = tag_text.attrs["data-pre-plain-text"]
-                        message_datetime = str_to_datetime(find_date(message_info) + ' ' + find_time(message_info))
-                        message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace("\n",
-                                                                                                                 ' ')
-                    else:
-                        message_datetime = get_time_from_tag(tag)
-                    debug(f"Message: \"{message_text}\"")
-                    message_quote_sender, message_quote_text = get_quote_from_tag(tag)
-                    # message_text = self.get_ocr_from_tag(tag, message_text)
-                    watson_response = self.Watson.message(message_text, do_print=True)
-                    dict_messages.update(
-                        {"_id": message_id,
-                         'sender': message_sender,
-                         'message': message_text,
-                         'datetime': message_datetime,
-                         'quote': {'sender': message_quote_sender,
-                                   'message': message_quote_text},
-                         'watson_response': watson_response
-                         })
-                    debug("Final Message Dictionary ->", dict_messages)
-                    pprint(dict_messages)
-                    try:
-                        self.Mongo.insert(dict_messages)
-                    except:
-                        warning(f"Tried to insert into mongo but error occurred.", exc_info=True)
-                    if not run_forever:
-                        info("breaking due to lack of passed argument: run_forever")
-                        print("breaking due to lack of passed argument: run_forever")
-                        break
-            except:
-                error(f"Some problem has occured.", exc_info=True)
-                print("Something wrong happened during the loop.")
-                break
 
     def run_bot(self):
         name, message_text = ["" for _ in range(2)]
         message_div_class = "message-in"
         last_tag = None
-        # contacts = {}
         dialog_tree = {}
         while True:
             try:
@@ -331,7 +265,7 @@ class WhatsApp:
         search.send_keys(chat_name + Keys.ENTER)
         self.find_wait("copyable-area", By.CLASS_NAME)
         sleep(.5)
-        info(f"Entered into the chat: \"{name}\".")
+        info(f"Entered into the chat: \"{chat_name}\".")
 
     def in_chat_screen(self):
         return True if self.find_wait("copyable-area", By.CLASS_NAME) is not None else False
@@ -339,18 +273,3 @@ class WhatsApp:
     def quit(self):
         info("Exiting Whatsapp Web...")
         self.browser.quit()
-
-
-if __name__ == '__main__':
-    parser = ArgumentParser()
-    parser.add_argument('-rf', '--run_forever', dest='run_forever', action='store_true',
-                        help='running forever or not')
-    args = parser.parse_args()
-    basicConfig(handlers=[FileHandler(encoding='utf-8', filename='whatsapp.log', mode='w')],
-                level=DEBUG,
-                format=u'%(levelname)s - %(name)s - %(asctime)s: %(message)s')
-    wa = WhatsApp(session="mysession")
-    name = 'Genesis Bot Sandbox'
-    wa.run_bot(name)
-    # wa.unread_messages()
-    wa.quit()
