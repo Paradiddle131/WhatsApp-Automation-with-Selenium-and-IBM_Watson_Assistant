@@ -1,6 +1,6 @@
 from base64 import b64decode
 from io import BytesIO
-from json import load
+from json import load, dump
 from logging import debug, info, error
 from os import path, getcwd
 from time import sleep
@@ -16,7 +16,6 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from IBM_Watson_Assistant import Watson
 from OCR import OCR
 from whatsapp_helper import *
 
@@ -26,11 +25,44 @@ path_home = getcwd()
 cnt = 0
 
 
+class Nodes():
+    FATURA_ALAMADIM = "FATURA_ALAMADIM"
+    PAKET_YUKLENMEMIS = "PAKET_YUKLENMEMIS"
+
+
 class BotActions:
-    WAIT_FOR_NODE_INPUT = "Wait for node input"
     GREET = "Greet"
+    MENU = "Menu"
 
 
+class Dialog:
+    def __init__(self):
+        with open("bot_dialog_tree.json", encoding='utf-8') as f:
+            try:
+                self.tree = load(f)
+            except:  # Empty JSON file
+                self.tree = {}
+
+    def set_data(self, name, pair):
+        if name in self.tree.keys():
+            self.tree[name].update(pair)
+        else:
+            self.tree.update({name: pair})
+        with open("bot_dialog_tree.json", "w+", encoding='utf-8') as f:
+            dump(self.tree, f)
+        # self.tree.update(pair)
+        # with open("bot_dialog_tree.json", "w+", encoding='utf-8') as f:
+        #     dump(self.tree, f)
+
+    def setup(self, name):
+        """Initializes/resets dialog"""
+        self.tree = {}
+        self.set_data(name, {"action": BotActions.GREET,
+                             "node": "",
+                             "level": 0})
+
+
+# region functions
 def get_time_from_tag(tag):
     h, m = int(find_time(tag.text).split(':')[0]), int(find_time(tag.text).split(':')[1][:2])
     return datetime.now().replace(hour=h, minute=m)
@@ -69,10 +101,20 @@ def change_datetime_format(message_text):
         debug("Given date is already in mm/dd/yyyy format.", exc_info=True)
 
 
+def current_chat_name(soup):
+    try:
+        return soup.find_all("header")[1].contents[1].contents[0].contents[0].text.strip()
+    except:
+        debug(f"Cannot get current chat name. It can be the main screen of the client.")
+
+
+# endregion
+
 class WhatsApp:
     browser = None
     timeout = 10
 
+    # region init
     def __init__(self, initialize_whatsapp=True, session=None):
         chrome_options = Options()
         if session:
@@ -97,17 +139,18 @@ class WhatsApp:
             self.find_wait("copyable-text.selectable-text", By.CLASS_NAME, timeout=30)
             self.browser.maximize_window()
             self.OCR = OCR()
-            self.Watson = Watson()
             self.participants_list_path = path.join(path_home, 'participants_list.csv')
+            from splunk import Splunk
+            self.splunk = Splunk()
             from bot import Bot
-            self.bot = Bot()
+            self.bot = Bot(self.splunk)
 
     def find_wait(self, element_xpath, by=By.XPATH, timeout=10):
         return WebDriverWait(self.browser, timeout).until(
             EC.presence_of_element_located((by, element_xpath)))
 
     def send_message(self, name, message):
-        print(f" MOCK SENDING MESSAGE {message} to {name}")
+        print(f" MOCK SENDING MESSAGE to {name}:\n {message}")
         '''if not self.in_chat_screen:
             self.enter_chat_screen(name)
         try:
@@ -191,25 +234,23 @@ class WhatsApp:
         debug(f"GSM No: {message_sender} is classified as \"crew member\".")
         return message_sender
 
-
+    # endregion
     def run_bot(self):
         name, message_text = ["" for _ in range(2)]
-        message_div_class = "message-in"
+        message_div_class = "message-out"
         last_tag = None
-        dialog_tree = {}
+        dialog = Dialog()
         while True:
             try:
-                with open("bot_dialog_tree.json") as f:
-                    dialog_tree = load(f)
                 new_sender = self.get_new_sender()
-                if self.get_new_sender() is not None:
-                    self.enter_chat_screen(new_sender)
-                    if new_sender not in dialog_tree.keys():
-                        dialog_tree.update({new_sender: {"action": BotActions.GREET}})
-                        name = new_sender
-                        self.enter_chat_screen(name)
-                if name != "":
+                name = new_sender if new_sender is not None else name
+                if name:
+                    if name not in dialog.tree.keys():
+                        dialog.setup(name)
                     soup = BeautifulSoup(self.browser.page_source, "html.parser")
+                    if current_chat_name(soup) != name:
+                        self.enter_chat_screen(name)
+                        soup = BeautifulSoup(self.browser.page_source, "html.parser")
                     tag = soup.find_all("div", class_=message_div_class)[-1]
                     tag_text = tag.find_all("div", class_="copyable-text")
                     if tag != last_tag:
@@ -218,7 +259,7 @@ class WhatsApp:
                         if tag_text:
                             tag_text = tag_text[-1]
                             message_text = tag_text.find("span", class_="selectable-text").find("span").text.replace(
-                                "\n", ' ') \
+                                "\n", ' ').strip().lower() \
                                 if tag_text.find("span", class_="selectable-text") is not None \
                                 else tag_text.find("img", class_="copyable-text").attrs['alt']
                         # message_text = self.get_ocr_from_tag(tag, message_text)
@@ -226,9 +267,11 @@ class WhatsApp:
                         if do_contains_date(message_text):
                             message_text = change_datetime_format(message_text)
                         try:
-                            response_http = self.bot.get_response(message_text, dialog_tree[name])
-                            debug("HTTP Response of bot -> " + response_http)
-                            self.send_message(name=name, message=response_http)
+                            if message_text == "menu" or message_text == "menü":
+                                dialog.set_data(name, {"action": BotActions.MENU})
+                            response_bot = self.bot.get_response(message_text, dialog, name)
+                            debug("HTTP Response of bot -> " + response_bot)
+                            self.send_message(name=name, message=response_bot)
                             last_tag = tag
                         except:
                             print("No response from bot.")
@@ -256,16 +299,18 @@ class WhatsApp:
         try:
             return soup.find("span", attrs={
                 "aria-label": re.compile(r"[0-9] unread message")}).parent.parent.parent.parent.parent.contents[
-                0].contents[0].text
+                0].contents[0].text.strip()
         except:
             return None
 
     def enter_chat_screen(self, chat_name):
-        search = self.find_wait("copyable-text.selectable-text", by=By.CLASS_NAME, timeout=50)
-        search.send_keys(chat_name + Keys.ENTER)
-        self.find_wait("copyable-area", By.CLASS_NAME)
-        sleep(.5)
-        info(f"Entered into the chat: \"{chat_name}\".")
+        if chat_name:
+            search = self.find_wait("copyable-text.selectable-text", by=By.CLASS_NAME, timeout=50)
+            search.send_keys(chat_name + Keys.ENTER)
+            self.find_wait("copyable-area", By.CLASS_NAME)
+            info(f"Entered into the chat: \"{chat_name}\".")
+        else:
+            raise Exception("No chat_name given.")
 
     def in_chat_screen(self):
         return True if self.find_wait("copyable-area", By.CLASS_NAME) is not None else False
